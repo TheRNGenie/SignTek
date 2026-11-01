@@ -1,6 +1,6 @@
 {
-  "version": "1.8.0",
+  "version": "1.8.1",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 14304568,
-  "notes": "- New tab 1d. Uno R4: install firmware on an UNO R4 WiFi (Arduino or Elegoo) straight from the app, wiring table and pictures (no soldering), and test patterns sent from the app."
+  "size": 14305106,
+  "notes": "- Uno install: resets the Uno into install mode the same way the Arduino IDE does, retries once, and lists the ports in the log."
 }

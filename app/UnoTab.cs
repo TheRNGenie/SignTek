@@ -207,6 +207,8 @@ namespace CasinoSignTool
             return b;
         }
 
+        bool ctxHoldsPort(string port) { try { using var t = new SerialPort(port); t.Open(); t.Close(); return false; } catch { return true; } }
+
         static NumericUpDown Num(int min, int max, int val) => new NumericUpDown { Minimum = min, Maximum = max, Value = val, Width = 80 };
         int Mask() { int m = 0; for (int i = 0; i < 4; i++) if (_mask[i].Checked) m |= 1 << i; return m; }
 
@@ -254,13 +256,18 @@ namespace CasinoSignTool
             _state.ForeColor = SystemColors.ControlText; _state.Text = "Installing… don't unplug the Uno.";
             try
             {
+                foreach (var pi in PortInfo.Scan(out _)) Log($"  port {pi.Port}: {pi.Name} (USB id {(pi.Vid.Length > 0 ? pi.Vid : "?")})");
+                if (ctxHoldsPort(port)) Log("  Note: the top bar may be connected to this port; press Disconnect at the top first if the install fails.");
                 Log($"Putting the Uno on {port} into install mode (1200 baud touch)…");
                 await Task.Run(() =>
                 {
                     try
                     {
-                        using var sp = new SerialPort(port, 1200);
-                        sp.Open(); sp.DtrEnable = false; System.Threading.Thread.Sleep(100); sp.Close();
+                        // Same as the Arduino IDE: open at 1200 baud with DTR on, then drop DTR and close.
+                        using var sp = new SerialPort(port, 1200) { DtrEnable = true, RtsEnable = true };
+                        sp.Open(); System.Threading.Thread.Sleep(50);
+                        sp.DtrEnable = false; sp.RtsEnable = false; System.Threading.Thread.Sleep(50);
+                        sp.Close();
                     }
                     catch (Exception ex) { Log("  (touch: " + ex.Message + ")"); }
                     System.Threading.Thread.Sleep(2000);
@@ -273,6 +280,12 @@ namespace CasinoSignTool
                     if (alt != null) { Log($"The Uno moved to {alt.Port}."); port = alt.Port; }
                 }
                 int code = await RunBossac($"-d --port={port} -U -e -w \"{UnoFw}\" -R");
+                if (code != 0)
+                {
+                    Log("First try failed; trying again in 2 seconds…");
+                    await Task.Delay(2000);
+                    code = await RunBossac($"-d --port={port} -U -e -w \"{UnoFw}\" -R");
+                }
                 if (code == 0)
                 {
                     _state.ForeColor = Color.DarkGreen;
