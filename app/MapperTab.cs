@@ -133,6 +133,12 @@ namespace CasinoSignTool
                     var txt = col.GetBrightness() > 0.55f || active ? Brushes.Black : Brushes.White;
                     g.DrawString(Roles.Code(pin.R), roleFont, txt, r, center);
                 }
+                if (!string.IsNullOrEmpty(pin.Volts))
+                {
+                    // Voltage reading just inside the connector body, next to the pin.
+                    var vr = new RectangleF(r.Left - 10, top ? r.Top - 16 : r.Bottom + 1, r.Width + 20, 15);
+                    g.DrawString(pin.Volts + " V", numFont, Brushes.LightGreen, vr, center);
+                }
             }
 
             string caption = Map.FlipView ? "View: mirrored (looking at the other side of the connector)" : "View: looking into the connector, key notch up, pin 1 marked ▶";
@@ -146,7 +152,9 @@ namespace CasinoSignTool
         readonly HeaderView _view = new HeaderView();
         Label _pinTitle, _progress, _sniffOut, _probeState, _problems;
         ComboBox _role, _probeGpio, _sniffGpio;
-        TextBox _note;
+        TextBox _note, _volts;
+        Label _steps, _voltHint;
+        RadioButton _rbPanel, _rbV002;
         NumericUpDown _timeout;
         Button _useSuggestion;
         PinRole _suggested = PinRole.Unknown;
@@ -177,16 +185,21 @@ namespace CasinoSignTool
             left.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.Controls.Add(left, 0, 0);
 
-            var steps = new Label
-            {
-                AutoSize = true, MaximumSize = new Size(760, 0), Padding = new Padding(4),
-                Text = "How to map the header (click a pin, then):\n" +
-                       "  Step 1, power OFF, multimeter: beep each pin to the chassis (G) and the power rail (V, 3.3 V on the V-002), then to the driver chip legs: MBI5170 pin 2 = DATA, 3 = CLK, 4 = LAT, 13 = OE (? Help has the full steps).\n" +
-                       "  Step 2, safest, CPU-002 still plugged in and running: clip the sniff lead onto a pin and press Sniff. 3.3 V controller (V-002 measures 3.37 V): lead = one 10k to IO39, nothing to ground. 5 V controller: 10k/20k divider (Show breadboard picture). Test the lead first on a pin at full voltage: it must read about 100% high.\n" +
-                       "  Step 3, only if needed, CPU-002 UNPLUGGED: touch the probe lead (through a 1k resistor) to a pin and blink it. Watch the sign to see what reacts.\n" +
-                       "Arrow keys move between pins. The map saves itself; use \"Send map to board\" to keep a copy on the ESP32.",
-            };
-            left.Controls.Add(steps, 0, 0);
+            _steps = new Label { AutoSize = true, MaximumSize = new Size(760, 0), Padding = new Padding(4) };
+            var top = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Dock = DockStyle.Fill };
+            var chooser = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
+            chooser.Controls.Add(new Label { Text = "Which connector are you mapping?", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(4, 6, 8, 0) });
+            _rbPanel = new RadioButton { Text = "Panel 20-pin grey ribbon (current plan)", AutoSize = true };
+            _rbV002 = new RadioButton { Text = "V-002 50-pin (old plan)", AutoSize = true };
+            _rbPanel.CheckedChanged += (s, e) => { if (_rbPanel.Checked && !_loading) _ctx.SwitchMap("panel20"); };
+            _rbV002.CheckedChanged += (s, e) => { if (_rbV002.Checked && !_loading) _ctx.SwitchMap("v002"); };
+            chooser.Controls.Add(_rbPanel); chooser.Controls.Add(_rbV002);
+            var panelHelp = new Button { Text = "? Panel steps", AutoSize = true };
+            panelHelp.Click += (s, e) => Help.Show(FindForm(), "panel");
+            chooser.Controls.Add(panelHelp);
+            top.Controls.Add(chooser);
+            top.Controls.Add(_steps);
+            left.Controls.Add(top, 0, 0);
             left.Controls.Add(_view, 0, 1);
 
             var legend = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(2) };
@@ -218,7 +231,8 @@ namespace CasinoSignTool
             root.Controls.Add(BuildSide(), 1, 0);
 
             _probeTimer.Tick += (s, e) => UpdateProbeState();
-            _ctx.MapChanged += () => { _view.Map = _ctx.Map; _view.Invalidate(); UpdateProgress(); };
+            _ctx.MapChanged += () => { bool k = _view.Map != _ctx.Map; _view.Map = _ctx.Map; if (k) { UpdateKind(); SelectPin(1); } _view.Invalidate(); UpdateProgress(); };
+            UpdateKind();
             _ctx.StateChanged += () => { FillGpioLists(); UpdateProbeState(); };
             FillGpioLists();
             SelectPin(1);
@@ -260,6 +274,16 @@ namespace CasinoSignTool
             _note = new TextBox { Width = W };
             _note.TextChanged += (s, e) => { if (_loading) return; _ctx.Map[_view.Selected].Note = _note.Text; _ctx.RaiseMap(); };
             side.Controls.Add(_note);
+            side.Controls.Add(new Label { Text = "Voltage with the sign on (multimeter, black probe on ground):", AutoSize = true, MaximumSize = new Size(W, 0), Margin = new Padding(0, 6, 0, 0) });
+            var vrow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
+            _volts = new TextBox { Width = 70 };
+            _volts.TextChanged += (s, e) => { if (_loading) return; _ctx.Map[_view.Selected].Volts = _volts.Text.Trim(); _ctx.RaiseMap(); ShowVoltHint(); };
+            _volts.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; SelectPin(_view.Selected < _ctx.Map.PinCount ? _view.Selected + 1 : 1); _volts.Focus(); _volts.SelectAll(); } };
+            vrow.Controls.Add(_volts);
+            vrow.Controls.Add(new Label { Text = "V   (Enter = next pin)", AutoSize = true, Margin = new Padding(2, 6, 0, 0) });
+            side.Controls.Add(vrow);
+            _voltHint = new Label { AutoSize = true, MaximumSize = new Size(W, 0), ForeColor = Color.DarkGreen };
+            side.Controls.Add(_voltHint);
 
             // ---- Sniff (passive) ----
             side.Controls.Add(H("Sniff the pin (CPU-002 running)"));
@@ -340,12 +364,43 @@ namespace CasinoSignTool
             _pinTitle.Text = $"Pin {n}  ({((n % 2) == 1 ? "top" : "bottom")} row)";
             _role.SelectedIndex = (int)p.R;
             _note.Text = p.Note;
+            _volts.Text = p.Volts ?? "";
+            ShowVoltHint();
             _sniffOut.Text = p.LastSniff.Length > 0 ? "Last sniff: " + p.LastSniff : "";
             _useSuggestion.Visible = false;
             if (_probing >= 0) _view.Active = n;
             _loading = false;
             _view.Invalidate();
             UpdateProgress();
+        }
+
+        void UpdateKind()
+        {
+            _loading = true;
+            _rbPanel.Checked = _ctx.Map.IsPanel; _rbV002.Checked = !_ctx.Map.IsPanel;
+            _loading = false;
+            _steps.Text = _ctx.Map.IsPanel
+                ? "Panel 20-pin connector (the grey ribbon between two panels). The signal enters at the right end of each row and moves left.\n" +
+                  "  Step 1, sign ON, ribbon between two panels pulled off: measure each pin of the RIGHT-hand header (next to U34, U24, U29; it is the output of the right panel and still driven). Black probe on the minus leg (striped side) of a big 1000µF capacitor. Type each reading in the Voltage box and press Enter to move to the next pin.\n" +
+                  "  Step 2, sign OFF: beep each pin to the capacitor minus leg. Beeps = GND.\n" +
+                  "  Step 3: Logic analyzer tab. Record the busy pins (readings between about 0.5 V and 4.5 V) with the sign running. Only connect the ESP32 if no pin reads above 3.6 V, or use a level shifter (? Panel steps).\n" +
+                  "Pin 1 is marked by a small triangle or \"1\" beside the header. Odd pins are on one row, even pins on the other."
+                : "How to map the header (click a pin, then):\n" +
+                  "  Step 1, power OFF, multimeter: beep each pin to the chassis (G) and the power rail (V, 3.3 V on the V-002), then to the driver chip legs: MBI5170 pin 2 = DATA, 3 = CLK, 4 = LAT, 13 = OE (? Help has the full steps).\n" +
+                  "  Step 2, safest, CPU-002 still plugged in and running: clip the sniff lead onto a pin and press Sniff. 3.3 V controller (V-002 measures 3.37 V): lead = one 10k to IO39, nothing to ground. 5 V controller: 10k/20k divider (Show breadboard picture). Test the lead first on a pin at full voltage: it must read about 100% high.\n" +
+                  "  Step 3, only if needed, CPU-002 UNPLUGGED: touch the probe lead (through a 1k resistor) to a pin and blink it. Watch the sign to see what reacts.\n" +
+                  "Arrow keys move between pins. The map saves itself; use \"Send map to board\" to keep a copy on the ESP32.";
+        }
+
+        void ShowVoltHint()
+        {
+            var t = (_volts.Text ?? "").Replace(',', '.').Trim();
+            if (!double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v)) { _voltHint.Text = ""; return; }
+            _voltHint.ForeColor = v > 3.6 ? Color.DarkRed : Color.DarkGreen;
+            _voltHint.Text = v < 0.2 ? "About 0 V: ground, or a signal sitting low. Beep it to ground with the sign off to tell which."
+                : v > 4.5 ? "About 5 V: power, or a signal sitting high. Too high for the ESP32 directly (see ? Panel steps)."
+                : v >= 3.0 && v <= 3.6 ? "About 3.3 V: power or a signal sitting high, safe for the ESP32."
+                : "In between: a busy signal line (a multimeter shows the average). Record it with the logic analyzer." + (v > 3.6 ? " This one may peak at 5 V." : "");
         }
 
         void SetRole(PinRole r, bool advance)

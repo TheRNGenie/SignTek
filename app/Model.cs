@@ -34,7 +34,7 @@ namespace CasinoSignTool
         {
             PinRole.Unknown => "Unknown (not tested yet)",
             PinRole.GND => "GND (ground)",
-            PinRole.V5 => "+3.3V (power; the V-002 runs at 3.3 V)",
+            PinRole.V5 => "+ power (3.3 V on the V-002, maybe 5 V on a panel)",
             PinRole.NC => "Not connected / does nothing",
             PinRole.DataTop => "DATA (serial data, top half or only line)",
             PinRole.DataBot => "DATA 2 (serial data, bottom half)",
@@ -84,6 +84,7 @@ namespace CasinoSignTool
         public double SniffHz { get; set; }
         public double SniffDuty { get; set; } = -1;
         public bool LaChecked { get; set; }            // recorded by the logic analyzer at least once
+        public string Volts { get; set; } = "";        // multimeter reading with the sign on (panel map)
 
         [System.Web.Script.Serialization.ScriptIgnore]
         public PinRole R { get => Roles.FromCode(Role); set => Role = Roles.Code(value); }
@@ -93,6 +94,10 @@ namespace CasinoSignTool
     public class HeaderMap
     {
         public int PinCount { get; set; } = 50;
+        public string Kind { get; set; } = "v002";   // "v002" = 50-pin CPU connector, "panel20" = 20-pin panel input/output
+        [System.Web.Script.Serialization.ScriptIgnore]
+        public bool IsPanel => Kind == "panel20";
+        public static HeaderMap NewPanel() { var m = new HeaderMap { PinCount = 20, Kind = "panel20" }; m.Pins.Clear(); m.EnsurePins(); return m; }
         public bool FlipView { get; set; }           // mirror left/right (socket seen from the other side)
         public string ProbeGpio { get; set; } = "25";
         public string SniffGpio { get; set; } = "35";
@@ -197,6 +202,9 @@ namespace CasinoSignTool
         public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CasinoSignTool");
         static string FilePath => Path.Combine(Dir, "settings.json");
         public static string MapAutosave => Path.Combine(Dir, "header-map.json");
+        public static string PanelMapAutosave => Path.Combine(Dir, "panel-map-20pin.json");
+        public static string MapPath(string kind) => kind == "panel20" ? PanelMapAutosave : MapAutosave;
+        public string ActiveMap { get; set; } = "panel20";
         public static string ArtAutosave => Path.Combine(Dir, "pixel-art.json");
 
         public static AppSettings Load()

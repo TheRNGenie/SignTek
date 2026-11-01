@@ -30,8 +30,35 @@ namespace CasinoSignTool
         public Control Ui;
 
         public void RaiseState() => Ui.BeginInvoke((Action)(() => StateChanged?.Invoke()));
-        public void RaiseMap() { MapChanged?.Invoke(); try { System.IO.Directory.CreateDirectory(AppSettings.Dir); Map.Save(AppSettings.MapAutosave); } catch { } }
+        public void RaiseMap() { MapChanged?.Invoke(); try { System.IO.Directory.CreateDirectory(AppSettings.Dir); Map.Save(AppSettings.MapPath(Map.Kind)); } catch { } }
         public void RaiseCfg() => CfgChanged?.Invoke();
+
+        /// <summary>Load the saved map for "v002" (50-pin) or "panel20" (20-pin panel connector).</summary>
+        public HeaderMap LoadMap(string kind)
+        {
+            try
+            {
+                var path = AppSettings.MapPath(kind);
+                if (System.IO.File.Exists(path))
+                {
+                    var m = HeaderMap.Load(path);
+                    if (kind == "panel20") { m.Kind = "panel20"; if (m.PinCount != 20) return HeaderMap.NewPanel(); }
+                    return m;
+                }
+            }
+            catch { }
+            return kind == "panel20" ? HeaderMap.NewPanel() : new HeaderMap();
+        }
+
+        /// <summary>Switch the pin mapper and logic analyzer to the other connector. Each one keeps its own saved map.</summary>
+        public void SwitchMap(string kind)
+        {
+            if (Map.Kind == kind) return;
+            try { System.IO.Directory.CreateDirectory(AppSettings.Dir); Map.Save(AppSettings.MapPath(Map.Kind)); } catch { }
+            Map = LoadMap(kind);
+            if (Settings != null) { Settings.ActiveMap = kind; Settings.Save(); }
+            RaiseMap();
+        }
 
         /// <summary>Run a board command, show errors in the status bar instead of throwing.</summary>
         public async Task<Reply> Try(string cmd, int timeoutMs = 3000)
@@ -76,7 +103,7 @@ namespace CasinoSignTool
             _ctx.Settings = _settings;
             _ctx.Status = s => BeginInvoke((Action)(() => _status.Text = s));
 
-            try { if (System.IO.File.Exists(AppSettings.MapAutosave)) _ctx.Map = HeaderMap.Load(AppSettings.MapAutosave); } catch { }
+            _ctx.Map = _ctx.LoadMap(_settings.ActiveMap);
 
             BuildTopBar();
             BuildBody();
