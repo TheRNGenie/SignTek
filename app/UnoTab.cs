@@ -71,7 +71,7 @@ namespace CasinoSignTool
                 "1. Plug the Uno into this PC with a USB-C data cable. Nothing else needs to be connected to it yet.\n" +
                 "2. On the right, press Refresh and pick the Uno's port. It is marked \"likely the Uno\".\n" +
                 "3. Press Install Uno firmware and wait about 20 seconds until it says Done.\n" +
-                "If it fails: press the Uno's RESET button twice quickly (the L light starts fading in and out), then press Install again."));
+                "If it fails: press the Uno's RESET button twice quickly, so the L light (next to pin 13) slowly fades in and out, then press Install within 5 seconds."));
 
             left.Controls.Add(H("Step 2: wiring (sign unplugged, Uno unplugged)"));
             left.Controls.Add(P(
@@ -258,33 +258,34 @@ namespace CasinoSignTool
             {
                 foreach (var pi in PortInfo.Scan(out _)) Log($"  port {pi.Port}: {pi.Name} (USB id {(pi.Vid.Length > 0 ? pi.Vid : "?")})");
                 if (ctxHoldsPort(port)) Log("  Note: the top bar may be connected to this port; press Disconnect at the top first if the install fails.");
-                Log($"Putting the Uno on {port} into install mode (1200 baud touch)…");
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        // Same as the Arduino IDE: open at 1200 baud with DTR on, then drop DTR and close.
-                        using var sp = new SerialPort(port, 1200) { DtrEnable = true, RtsEnable = true };
-                        sp.Open(); System.Threading.Thread.Sleep(50);
-                        sp.DtrEnable = false; sp.RtsEnable = false; System.Threading.Thread.Sleep(50);
-                        sp.Close();
-                    }
-                    catch (Exception ex) { Log("  (touch: " + ex.Message + ")"); }
-                    System.Threading.Thread.Sleep(2000);
-                });
-                // The R4 WiFi's USB chip keeps the same COM port; if Windows renumbered it, pick the Arduino port again.
-                var again = PortInfo.Scan(out _);
-                if (!again.Any(p => p.Port == port))
-                {
-                    var alt = again.FirstOrDefault(p => p.Vid == "2341");
-                    if (alt != null) { Log($"The Uno moved to {alt.Port}."); port = alt.Port; }
-                }
-                int code = await RunBossac($"-d --port={port} -U -e -w \"{UnoFw}\" -R");
+                string args() => $"-d --port={port} -U -e -w \"{UnoFw}\" -R";
+                // Route 1: the Uno may already be in install mode (RESET pressed twice: the L light fades in and out).
+                Log("Try 1: is the Uno already in install mode?");
+                int code = await RunBossac(args());
                 if (code != 0)
                 {
-                    Log("First try failed; trying again in 2 seconds…");
-                    await Task.Delay(2000);
-                    code = await RunBossac($"-d --port={port} -U -e -w \"{UnoFw}\" -R");
+                    // Route 2: ask it to restart into install mode, the way the Arduino IDE does (1200 baud, DTR drop).
+                    Log($"Try 2: asking the Uno on {port} to restart into install mode…");
+                    await Task.Run(() =>
+                    {
+                        try
+                        {
+                            using var sp = new SerialPort(port, 1200) { DtrEnable = true, RtsEnable = true };
+                            sp.Open(); System.Threading.Thread.Sleep(50);
+                            sp.DtrEnable = false; sp.RtsEnable = false; System.Threading.Thread.Sleep(50);
+                            sp.Close();
+                        }
+                        catch (Exception ex) { Log("  (restart request: " + ex.Message + ")"); }
+                        System.Threading.Thread.Sleep(2500);
+                    });
+                    var again = PortInfo.Scan(out _);
+                    if (!again.Any(p => p.Port == port))
+                    {
+                        var alt = again.FirstOrDefault(p => p.Vid == "2341");
+                        if (alt != null) { Log($"The Uno moved to {alt.Port}."); port = alt.Port; }
+                    }
+                    code = await RunBossac(args());
+                    if (code != 0) { await Task.Delay(2000); Log("Try 3…"); code = await RunBossac(args()); }
                 }
                 if (code == 0)
                 {
@@ -295,7 +296,7 @@ namespace CasinoSignTool
                 else
                 {
                     _state.ForeColor = Color.DarkRed;
-                    _state.Text = "Install failed. Press the Uno's RESET button twice quickly (the L light fades in and out), press Refresh, pick the port again and press Install.";
+                    _state.Text = "Install failed. Do this: press the Uno's RESET button twice quickly, so the L light (next to pin 13) slowly fades in and out. Then press Install within 5 seconds.";
                 }
             }
             finally { _busy = false; _flash.Enabled = true; RefreshPorts(); }

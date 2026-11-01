@@ -1,6 +1,6 @@
 {
-  "version": "1.8.1",
+  "version": "1.8.2",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 14305106,
-  "notes": "- Uno install: resets the Uno into install mode the same way the Arduino IDE does, retries once, and lists the ports in the log."
+  "size": 14305182,
+  "notes": "- Uno install: works when the Uno is already in install mode (RESET pressed twice), otherwise restarts it the Arduino IDE way and retries."
 }

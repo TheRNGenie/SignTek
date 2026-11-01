@@ -271,7 +271,7 @@ The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel sign
 ## Install the Uno firmware (once)
 - Plug the Uno into the PC with a USB-C data cable.
 - Tab 1d: press Refresh, pick the port marked likely the Uno, press Install Uno firmware. It takes about 20 seconds.
-- If it fails: press the Uno's RESET button twice quickly (the L light fades in and out), press Refresh, pick the port again and press Install.
+- If it fails: press the Uno's RESET button twice quickly, so the L light (next to pin 13) slowly fades in and out, then press Install within 5 seconds.
 
 ## Wiring (sign and Uno unplugged)
 - Wire into the end of your ribbon plug as before, and plug it onto panel 2's input header. The grey ribbon stays off panel 1, and the row processors stay in.
