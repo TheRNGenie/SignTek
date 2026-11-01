@@ -48,7 +48,7 @@
 BluetoothSerial SerialBT;
 #endif
 
-#define FW_VERSION "3.0.2"
+#define FW_VERSION "3.0.3"
 
 constexpr uint16_t CMD_PORT = 3333;
 constexpr uint16_t DISCOVERY_PORT = 3334;
@@ -137,7 +137,7 @@ class LGFX : public lgfx::LGFX_Device {
 public:
   LGFX() {
     { auto c = _bus.config();
-      c.spi_host = HSPI_HOST; c.spi_mode = 0; c.freq_write = 40000000; c.freq_read = 16000000;
+      c.spi_host = HSPI_HOST; c.spi_mode = 0; c.freq_write = 27000000; c.freq_read = 16000000;
       c.spi_3wire = false; c.use_lock = true;
       c.pin_sclk = 14; c.pin_mosi = 13; c.pin_miso = 12; c.pin_dc = 2;
       c.dma_channel = SPI_DMA_CH_AUTO;
@@ -789,29 +789,48 @@ void scanWatchdog() {
 }
 
 // ============================================================================
+#define BOOTLOG(msg) do { Serial.print("BOOT: "); Serial.println(msg); Serial.flush(); } while (0)
+
 void setup() {
   Serial.begin(115200);
+  delay(200);
+  Serial.println();
+  BOOTLOG("casino_sign_driver " FW_VERSION " starting");
+
+  // Screen first, exactly like the screen test, before anything else can get in the way.
+  pinMode(LCD_BL_PIN, OUTPUT); digitalWrite(LCD_BL_PIN, HIGH);   // backlight on (plain GPIO, nothing else may use it)
+  bool lcdOk = lcd.init();
+  digitalWrite(LCD_BL_PIN, HIGH);
+  lcd.setRotation(0);
+  lcd.fillScreen(TFT_BLACK); lcd.setTextColor(TFT_WHITE); lcd.setTextSize(2); lcd.drawString("Casino Sign: starting...", 10, 10);
+  BOOTLOG(lcdOk ? "screen ready" : "screen init FAILED");
+
+  lcd.setTextSize(1); lcd.setTextColor(TFT_LIGHTGREY);
+  int y = 40;
+  auto step = [&](const char* what) { BOOTLOG(what); lcd.drawString(what, 10, y); y += 12; };
+
+  step("loading settings");
   prefs.begin("sign", false);
   loadSettings();
   updateBrightness();
   liveMutex = xSemaphoreCreateMutex();
+  step("mounting storage (first start can take 20 s)");
   fsBegin();
 
-  // Screen first, so there's something to see even if a later step has trouble.
-  pinMode(LCD_BL_PIN, OUTPUT); digitalWrite(LCD_BL_PIN, HIGH);   // backlight on (plain GPIO, nothing else may use it)
-  lcd.init(); lcd.setRotation(0);
-  lcd.fillScreen(TFT_BLACK); lcd.setTextColor(TFT_WHITE); lcd.setTextSize(2); lcd.drawString("Casino Sign: starting...", 10, 10);
-
   // Boot in DIAG mode until the app has saved a pin map, so unknown wiring is never driven.
+  step(cfg.configured ? "starting sign scan" : "diagnostics mode, releasing sign pins");
   if (cfg.configured) { runMode = RM_RUN; startScan(); }
   else { runMode = RM_DIAG; releaseSignPins(); }
 
   canvas.setColorDepth(1);
   canvas.createSprite(SIGN_W, SIGN_H);
 
+  step("loading playlist");
   contentBegin();          // loads the playlist, plays the startup animation
+  step("starting WiFi and network");
   netBegin();              // WiFi, web page, TCP port, discovery, OTA, MQTT, time, data fetcher
   btApply();
+  BOOTLOG("ready");
   drawUi();
   Serial.println("{\"evt\":\"boot\",\"fw\":\"" FW_VERSION "\"}");
 }

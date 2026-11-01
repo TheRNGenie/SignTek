@@ -1,6 +1,6 @@
 {
-  "version": "1.1.1",
+  "version": "1.1.2",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8436086,
-  "notes": "- New picture in tab 1: Show whole setup (3.3 V, V-002) with both boards and the breadboard.\n- Sniff steps updated for 3.3 V controllers like the V-002: one 10k resistor, nothing to ground.\n- Includes everything from 1.1.0 (self-updater, screen test, firmware 3.0.2)."
+  "size": 8436588,
+  "notes": "- Sign firmware 3.0.3: the screen now starts first, exactly like the screen test, and lists each start-up step on screen and in Watch board output.\n- After updating: tab 0, press Install firmware (USB) to put 3.0.3 on the board."
 }
