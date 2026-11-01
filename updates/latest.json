@@ -1,6 +1,6 @@
 {
-  "version": "1.2.5",
+  "version": "1.2.6",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8701315,
-  "notes": "- Logic analyzer Turbo speed: 2-3x faster on channels 3, 5, 6, 7, 8.\n- Sign firmware 3.1.1 (needed for Turbo). After updating, install it in tab 0."
+  "size": 8701533,
+  "notes": "- Logic analyzer warns when Turbo is used with firmware older than 3.1.1.\n- Includes sign firmware 3.1.1: install it in tab 0."
 }

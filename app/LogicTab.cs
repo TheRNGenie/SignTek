@@ -295,6 +295,12 @@ namespace CasinoSignTool
                 _data = Convert.FromBase64String(r.Str("cap"));
                 _sampleRate = r.Dbl("rate");
                 bool trigOk = trig < 0 || r.Bool("triggered");
+                if (Turbo && !r.Bool("turbo"))
+                {
+                    _state.ForeColor = Color.DarkRed;
+                    _state.Text = "The board's firmware is too old for Turbo (it recorded very slowly instead). Install the newest firmware in tab 0 (3.1.1 or newer), press Connect, then capture again.";
+                    return;
+                }
                 _last = Analysis.Run(_data, _sampleRate);
                 AutoSave(r.Str("cap"));
                 for (int i = 0; i < 8; i++) if (_hdr[i].Value > 0) _ctx.Map[(int)_hdr[i].Value].LaChecked = true;
