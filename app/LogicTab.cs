@@ -103,7 +103,7 @@ namespace CasinoSignTool
             var orow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
             orow.Controls.Add(new Label { Text = "Speed:", AutoSize = true, Margin = new Padding(0, 7, 2, 0) });
             _rate = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
-            _rate.Items.AddRange(new object[] { "Fastest (finds CLK and DATA)", "1 MHz", "100 kHz (finds rows A, B, C and OE)", "20 kHz (slowest, longest)" });
+            _rate.Items.AddRange(new object[] { "Fastest (finds CLK and DATA)", "1 MHz", "100 kHz (finds rows A, B, C and OE)", "20 kHz (slowest, longest)", "Turbo: 2-3x faster, channels 3, 5, 6, 7, 8 only" });
             _rate.SelectedIndex = 0;
             orow.Controls.Add(_rate);
             left.Controls.Add(orow);
@@ -274,7 +274,9 @@ namespace CasinoSignTool
             _state.Text = busy.Count == 0 ? "Your map has no sniffed busy pins yet. Type the header pins by hand." : $"Filled empty channels from {busy.Count} busy pins in your map.";
         }
 
-        int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, _ => 0 };
+        int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, 4 => 1, _ => 0 };
+        bool Turbo => _rate.SelectedIndex == 4;
+        static readonly int[] TurboChannels = { 2, 4, 5, 6, 7 };   // 0-based: GPIO 25, 5, 18, 19, 23
 
         async Task Capture()
         {
@@ -282,7 +284,7 @@ namespace CasinoSignTool
             if (_ctx.Mode != "diag" && !await _ctx.SetMode("diag")) { _state.ForeColor = Color.DarkRed; _state.Text = "Couldn't switch the board to Diagnostics mode."; return; }
             _capture.Enabled = false;
             _state.ForeColor = SystemColors.ControlText;
-            int n = 49152;
+            int n = Turbo ? 16383 : 49152;
             int trig = _trig.SelectedIndex - 1;
             double secs = RateHz == 0 ? 0.02 : (double)n / RateHz;
             int timeout = (int)(secs * 1000) + (_ctx.Board.OverWifi ? 6000 : 12000);
@@ -297,6 +299,9 @@ namespace CasinoSignTool
                 AutoSave(r.Str("cap"));
                 for (int i = 0; i < 8; i++) if (_hdr[i].Value > 0) _ctx.Map[(int)_hdr[i].Value].LaChecked = true;
                 _ctx.RaiseMap();
+                if (Turbo)
+                    for (int i = 0; i < 8; i++)
+                        if (!TurboChannels.Contains(i)) { var ci = _last.Ch[i]; ci.Code = "?"; ci.Guess = "not recorded (Turbo only records channels 3, 5, 6, 7, 8)"; ci.Why = ""; }
                 _wave.SetData(_data, _sampleRate, Labels());
                 ShowResults();
                 _state.ForeColor = Color.DarkGreen;
@@ -306,7 +311,7 @@ namespace CasinoSignTool
             catch (Exception ex)
             {
                 _state.ForeColor = Color.DarkRed;
-                _state.Text = "Capture failed: " + ex.Message + (ex.Message.Contains("CAPTURE") || ex.Message.Contains("unknown") ? " Install firmware 3.1.0 or newer (tab 0)." : "");
+                _state.Text = "Capture failed: " + ex.Message + (ex.Message.Contains("CAPTURE") || ex.Message.Contains("unknown") ? " Install the newest firmware (tab 0)." : "");
             }
             finally { _capture.Enabled = true; }
         }

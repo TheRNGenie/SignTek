@@ -48,7 +48,7 @@
 BluetoothSerial SerialBT;
 #endif
 
-#define FW_VERSION "3.1.0"
+#define FW_VERSION "3.1.1"
 
 constexpr uint16_t CMD_PORT = 3333;
 constexpr uint16_t DISCOVERY_PORT = 3334;
@@ -407,8 +407,10 @@ static inline uint8_t laRead() {
 String laCapture(uint32_t n, uint32_t rateHz, int trigCh, int trigEdge) {
   for (int i = 0; i < 8; i++) if (probeFind(LA_PINS[i], false)) return err(String("GPIO ") + LA_PINS[i] + " is a probe output, turn it off first");
   for (int i = 0; i < 8; i++) pinMode(LA_PINS[i], INPUT);
+  bool turbo = rateHz == 1;                          // rate 1 = turbo: raw reads of GPIO 0-31 only (channels 3, 5-8)
+  if (turbo) { rateHz = 0; n = min<uint32_t>(n, 16383); }
   n = constrain(n, 1024, 65536); n -= n % 3;        // multiple of 3 keeps base64 simple
-  uint8_t* buf = (uint8_t*)malloc(n);
+  uint8_t* buf = (uint8_t*)malloc(turbo ? n * 4 : n);
   if (!buf) { n = 24576; buf = (uint8_t*)malloc(n); }
   if (!buf) return err("not enough memory for a capture");
   uint32_t cpu = ESP.getCpuFreqMHz() * 1000000UL;
@@ -429,11 +431,27 @@ String laCapture(uint32_t n, uint32_t rateHz, int trigCh, int trigEdge) {
     }
   }
   uint32_t start = ESP.getCycleCount(), next = start;
-  if (period == 0) { for (uint32_t i = 0; i < n; i++) buf[i] = laRead(); }
+  if (turbo) {
+    volatile uint32_t* w = (volatile uint32_t*)buf;
+    uint32_t i = 0;
+    for (; i + 8 <= n; i += 8) {
+      w[i] = REG_READ(GPIO_IN_REG); w[i + 1] = REG_READ(GPIO_IN_REG); w[i + 2] = REG_READ(GPIO_IN_REG); w[i + 3] = REG_READ(GPIO_IN_REG);
+      w[i + 4] = REG_READ(GPIO_IN_REG); w[i + 5] = REG_READ(GPIO_IN_REG); w[i + 6] = REG_READ(GPIO_IN_REG); w[i + 7] = REG_READ(GPIO_IN_REG);
+    }
+    for (; i < n; i++) w[i] = REG_READ(GPIO_IN_REG);
+  }
+  else if (period == 0) { for (uint32_t i = 0; i < n; i++) buf[i] = laRead(); }
   else for (uint32_t i = 0; i < n; i++) { while ((int32_t)(ESP.getCycleCount() - next) < 0) {} buf[i] = laRead(); next += period; }
   uint32_t cycles = ESP.getCycleCount() - start;
   if (noInt) portENABLE_INTERRUPTS();
   double actual = cycles ? (double)n * cpu / cycles : 0;
+  if (turbo) {   // squeeze each 32-bit read into the usual channel byte (in place: byte i never passes word i)
+    uint32_t* w = (uint32_t*)buf;
+    for (uint32_t i = 0; i < n; i++) {
+      uint32_t a = w[i];
+      buf[i] = (((a >> 25) & 1) << 2) | (((a >> 5) & 1) << 4) | (((a >> 18) & 1) << 5) | (((a >> 19) & 1) << 6) | (((a >> 23) & 1) << 7);
+    }
+  }
 
   Stream* o = replyTo;
   o->print("{\"ok\":true,\"cap\":\"");
@@ -445,7 +463,7 @@ String laCapture(uint32_t n, uint32_t rateHz, int trigCh, int trigEdge) {
   }
   if (k) o->write((const uint8_t*)chunk, k);
   free(buf);
-  String tail = "\",\"n\":" + String(n) + ",\"rate\":" + String(actual, 0) + ",\"triggered\":" + (triggered ? "true" : "false") +
+  String tail = "\",\"n\":" + String(n) + ",\"rate\":" + String(actual, 0) + ",\"triggered\":" + (triggered ? "true" : "false") + ",\"turbo\":" + (turbo ? "true" : "false") +
                 ",\"pins\":" + intList(LA_PINS, 8) + "}";
   return tail;
 }

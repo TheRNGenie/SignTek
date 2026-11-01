@@ -151,6 +151,7 @@ Press Show wiring picture (both boards) in the tab for a drawing of every wire. 
 - 4. The Result column and the text box show the guess for each channel, with the reason. Press Put results in the pin map to save them in tab 1.
 - 5. Press Pick the next 8 pins to check again. Once CLK and LAT are found it keeps them on channels 1 and 2 and puts 6 pins that haven't been recorded yet on the rest. Move the clips to match and capture again. The line under the socket shows how many pins are left.
 - 6. For the row lines (A, B, C) and OE, also capture at 100 kHz: many rows fit into one capture, so the slow on/off pattern is clear.
+- Turbo speed records roughly 2 to 3 times faster than Fastest, but only on channels 3, 5, 6, 7 and 8 (GPIO 25, 5, 18, 19, 23), and for a shorter time (16,383 samples, about 2 ms). Use it when a pin changes faster than Fastest can follow: Fastest shows it as random single-sample blips. Needs firmware 3.1.1 or newer.
 
 ## How it decides
 - CLK: the busiest line, ticking in bursts with pauses between.
