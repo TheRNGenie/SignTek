@@ -200,8 +200,9 @@ In tab 1 (Pin mapper), choose Panel 20-pin grey ribbon at the top. It has its ow
 - 5. Press Save my captures as one file (to send) in the Logic analyzer tab and keep it: it holds everything needed to work out the signal format.
 
 ## Driving the panels later
-- The 74HC244 buffers run from the panel's 5 V supply if Step 1 found 5 V. Then a 3.3 V ESP32 signal may not count as high, and a 74HCT245 level shifter goes between the ESP32 and the panel (tab 3 shows the wiring).
-- If the panel side is 3.3 V, the ESP32 connects directly through small resistors." },
+- Measured on Logan's sign: the panels' supply is 5 V (across the big capacitors), but every signal pin is 3.3 V or less and the input chip U2 runs at about 2.4 V (its pin 20). So no level shifter is needed.
+- Wire each ESP32 output to its panel input pin through a 220 Ω resistor (red-red-brown) as a safety margin, and join ESP32 GND to a panel GND pin.
+- Check your own sign the same way: if U2 pin 20 ever reads 5 V, use a 74HCT245 level shifter instead (tab 3 shows the wiring)." },
 
             new HelpTopic { Id = "mapper", Title = "Step 3. Map the 50-pin connector", Tab = "1. Pin mapper",
                 Summary = "Click a pin, test it (multimeter, sniff, or probe), and mark what it is.",

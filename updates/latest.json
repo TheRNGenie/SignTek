@@ -1,6 +1,6 @@
 {
-  "version": "1.3.0",
+  "version": "1.3.1",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8707651,
-  "notes": "- Pin mapper: new Panel 20-pin grey ribbon map (choose it at the top of tab 1), kept separate from the 50-pin map.\n- Voltage box for each pin (Enter jumps to the next pin); readings show on the connector picture with a hint about what they mean.\n- New help page: Map the 20-pin panel connector (? Panel steps in tab 1).\n- No firmware change."
+  "size": 8707735,
+  "notes": "- Pin mapper: Panel 20-pin grey ribbon map (choose it at the top of tab 1), separate from the 50-pin map, with a Voltage box per pin.\n- Help: Map the 20-pin panel connector, now with your measurements: no level shifter needed, use 220 ohm resistors when driving.\n- No firmware change."
 }
