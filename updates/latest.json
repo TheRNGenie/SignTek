@@ -1,6 +1,6 @@
 {
-  "version": "1.7.5",
+  "version": "1.7.6",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 9189314,
-  "notes": "- Clearer panel test picture (tab 1c, Show test wiring picture): a big header with each pin's wire written next to it, colour-matched to the ESP32 plug pins, plus a connection table."
+  "size": 9197961,
+  "notes": "- Header pictures flipped to match the beep test: looking at the header, ground (15) is bottom-RIGHT, clock (16) bottom-left, odd pins in the right column.\n- Clearer panel test picture: a big header with each pin's wire written next to it, plus a connection table."
 }
