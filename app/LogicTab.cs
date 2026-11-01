@@ -103,7 +103,7 @@ namespace CasinoSignTool
             var orow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
             orow.Controls.Add(new Label { Text = "Speed:", AutoSize = true, Margin = new Padding(0, 7, 2, 0) });
             _rate = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
-            _rate.Items.AddRange(new object[] { "Fastest (finds CLK and DATA)", "1 MHz", "100 kHz (finds rows A, B, C and OE)", "20 kHz (slowest, longest)", "Turbo: 2-3x faster, channels 3, 5, 6, 7, 8 only", "Fast 20 MHz: all 8 channels (experimental, firmware 3.2.0)", "Fast 10 MHz: all 8 channels (experimental, firmware 3.2.0)" });
+            _rate.Items.AddRange(new object[] { "Fastest (finds CLK and DATA)", "1 MHz", "100 kHz (finds rows A, B, C and OE)", "20 kHz (slowest, longest)", "Turbo: 2-3x faster, channels 3, 5, 6, 7, 8 only", "Fast 10 MHz: all 8 channels, exact timing (firmware 3.2.0)" });
             _rate.SelectedIndex = 0;
             orow.Controls.Add(_rate);
             left.Controls.Add(orow);
@@ -279,8 +279,8 @@ namespace CasinoSignTool
             _state.Text = busy.Count == 0 ? "Your map has no sniffed busy pins yet. Type the header pins by hand." : $"Filled empty channels from {busy.Count} busy pins in your map.";
         }
 
-        int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, 4 => 1, 5 => 2, 6 => 3, _ => 0 };
-        bool Fast => _rate.SelectedIndex == 5 || _rate.SelectedIndex == 6;
+        int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, 4 => 1, 5 => 3, _ => 0 };
+        bool Fast => _rate.SelectedIndex == 5;
         bool Turbo => _rate.SelectedIndex == 4;
         static readonly int[] TurboChannels = { 2, 4, 5, 6, 7 };   // 0-based: GPIO 25, 5, 18, 19, 23
 

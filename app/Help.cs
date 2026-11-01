@@ -208,11 +208,11 @@ In tab 1 (Pin mapper), choose Panel 16-pin grey ribbon at the top. It has its ow
 
 ## Good to know
 - Channels 5 and 8 (GPIO 5 and 23, the SPI plug's 1st and 4th pins) are pulled up by the SD card slot. A sign pin that isn't driven, or a loose clip, reads as always HIGH on those two channels. If a pin shows always high there but your meter read about 0 V, record it again on another channel. Pick the next 8 pins uses these two channels last.
-- Some lines are faster than Turbo can follow. Use the Fast 20 MHz speed for them (below).
+- Use the Fast 10 MHz speed (below) for fast lines: all 8 channels with exact timing.
 - Keep one known pin (pin 9, row line A) on channel 1 in every round. Then every capture can be lined up against the same reference, and a wire on the wrong pin shows up straight away.
 
-## Fast 20 MHz and Fast 10 MHz speeds (experimental)
-- Needs sign firmware 3.2.0 or newer (tab 0). Records all 8 channels at once, 20 or 10 million times a second, for about 1.5 ms (30,000 samples). The ESP32's sound/camera hardware (I2S) does the recording, so the timing is exact.
+## Fast 10 MHz speed
+- Needs sign firmware 3.2.0 or newer (tab 0). Records all 8 channels at once, 10 million times a second, for 3 ms (30,000 samples). Tested on Logan's board: the self-check passes. (A 20 MHz setting was tried, but the ESP32 only delivered each 10 MHz sample twice, so it was removed.) The ESP32's sound/camera hardware (I2S) does the recording, so the timing is exact.
 - It uses GPIO 16 and 17 (the RGB LED pads) for its own clock, so the board's small RGB LED flickers while it records. Nothing needs to be wired to them.
 - The board checks itself on every Fast capture: it records its own test clock and makes sure it looks right. If the check fails, the message under the Capture button says so. Press Save my captures as one file (to send) and send it: the file holds the check results.
 - If Fast says it got no data from I2S, use Turbo for now and send the captures file.

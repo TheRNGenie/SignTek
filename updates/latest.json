@@ -1,6 +1,6 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8716774,
-  "notes": "- New sign firmware 3.2.0: install it in tab 0.\n- Logic analyzer: new Fast 20 MHz and Fast 10 MHz speeds that record all 8 channels at once (experimental, with a built-in self-check).\n- Pick the next 8 pins uses channels 5 and 8 last.\n- Panel help updated."
+  "size": 8716846,
+  "notes": "- Logic analyzer: Fast 10 MHz (all 8 channels, exact timing) works on the board; the 20 MHz option is removed because it only repeated each 10 MHz sample.\n- No firmware change (keep 3.2.0)."
 }
