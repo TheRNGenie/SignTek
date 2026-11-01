@@ -63,7 +63,7 @@ namespace CasinoSignTool
             left.Controls.Add(H("Drive panel 2 from the UNO R4 WiFi (no soldering)"));
             left.Controls.Add(P(
                 "The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel signals, so nothing needs soldering. " +
-                "This tab installs the Uno's firmware and sends it test patterns. Later it will also play back your recording from tab 1b. " +
+                "This tab installs the Uno's firmware, plays back the sign's own signals (rebuilt from your recordings) and sends test patterns. " +
                 "The ESP32 is not used on this tab, so you can leave it unplugged."));
 
             left.Controls.Add(H("Step 1: install the Uno firmware (once)"));
@@ -95,7 +95,7 @@ namespace CasinoSignTool
             left.Controls.Add(H("Step 3: test"));
             left.Controls.Add(P(
                 "4. Plug the Uno into the PC, press Connect on the right, then plug the sign in.\n" +
-                "5. Press Start test with All on. Panel 2 (and the panels after it) should light.\n" +
+                "5. Press Play the recording first: panel 2 (and the panels after it) should show part of the sign's message. Then try Start test with All on.\n" +
                 "6. Nothing lights? Try these one at a time, a few seconds each: Clock edge = falling; OE inverted; Latch inverted; Timing pins = always low, then always high; Slow down = 20.\n" +
                 "Take a phone photo of anything that lights and send it over, together with which settings were on."));
 
@@ -131,6 +131,12 @@ namespace CasinoSignTool
             st.Click += async (s, e) => await Cmd("STATUS");
             run.Controls.Add(start); run.Controls.Add(stop); run.Controls.Add(st);
             right.Controls.Add(run);
+            var playRow = new FlowLayoutPanel { AutoSize = true };
+            var play = new Button { Text = "▶ Play the recording", AutoSize = true, Font = new Font(Font, FontStyle.Bold), ForeColor = Color.DarkGreen };
+            play.Click += async (s, e) => await PlayRecording();
+            playRow.Controls.Add(play);
+            playRow.Controls.Add(new Label { Text = "Sends the sign's own signals, rebuilt from your recordings, to panel 2.", AutoSize = true, MaximumSize = new Size(300, 0), Margin = new Padding(4, 4, 0, 0) });
+            right.Controls.Add(playRow);
             _status = new Label { AutoSize = true, MaximumSize = new Size(470, 0), Text = "", Margin = new Padding(3, 2, 0, 6) };
             right.Controls.Add(_status);
 
@@ -391,6 +397,26 @@ namespace CasinoSignTool
             _status.Text = mode == "test" ? $"Running test pattern: {Get("frames")} frames sent so far."
                          : mode == "replay" ? $"Playing the recording: {Get("frames")} frames sent so far."
                          : "Stopped (all outputs off).";
+        }
+
+        static string ReplayPath => Path.Combine(AppDir, "firmware", "uno-replay.txt");
+
+        async Task PlayRecording()
+        {
+            if (_sp == null) { _status.ForeColor = Color.DarkRed; _status.Text = "Press Connect first."; return; }
+            if (!File.Exists(ReplayPath)) { _status.ForeColor = Color.DarkRed; _status.Text = "firmware\\uno-replay.txt is missing: press Updates."; return; }
+            var words = File.ReadAllText(ReplayPath).Split(new[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            _status.ForeColor = SystemColors.ControlText; _status.Text = $"Sending the recording ({words.Length} clock steps)…";
+            var r = await Ask("LOAD " + words.Length);
+            Log("> LOAD " + words.Length); Log("< " + r);
+            if (r == null || !r.StartsWith("OK")) { _status.ForeColor = Color.DarkRed; _status.Text = "⚠ " + r; return; }
+            for (int i = 0; i < words.Length; i += 32)
+            {
+                var line = "W " + i + " " + string.Join(" ", words.Skip(i).Take(32));
+                r = await Ask(line);
+                if (r == null || !r.StartsWith("OK")) { Log("< " + r); _status.ForeColor = Color.DarkRed; _status.Text = "⚠ sending failed: " + r; return; }
+            }
+            await Cmd($"PLAY slow={(int)_slow.Value} edge={_edge.SelectedIndex}");
         }
 
         async Task Set(string key, int val)

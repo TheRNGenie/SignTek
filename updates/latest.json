@@ -1,6 +1,6 @@
 {
-  "version": "1.8.2",
+  "version": "1.8.3",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 14305182,
-  "notes": "- Uno install: works when the Uno is already in install mode (RESET pressed twice), otherwise restarts it the Arduino IDE way and retries."
+  "size": 14307053,
+  "notes": "- Tab 1d: Play the recording sends the sign's own panel signals (rebuilt from your recordings) from the Uno to panel 2."
 }

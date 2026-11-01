@@ -266,7 +266,7 @@ Needs sign firmware 3.4.0 or newer (tab 0).
                 Summary = "Install the Uno firmware from the app, wire 12 signals through 1 kΩ resistors, send test patterns.",
                 Body =
 @"# Uno R4: drive panel 2 without soldering
-The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel signals, so nothing needs soldering. Tab 1d installs its firmware and sends it test patterns. It will also play back your recording from tab 1b once that is added. The ESP32 isn't used on this tab.
+The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel signals, so nothing needs soldering. Tab 1d installs its firmware, plays back the sign's own signals (rebuilt from your recordings) and sends test patterns. The ESP32 isn't used on this tab.
 
 ## Install the Uno firmware (once)
 - Plug the Uno into the PC with a USB-C data cable.
@@ -284,7 +284,7 @@ The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel sign
 
 ## Test
 - Plug the Uno into the PC, press Connect, then plug the sign in.
-- Press Start test with All on. Panel 2 onward should light.
+- Press Play the recording first: panel 2 onward should show part of the sign's message. Then try Start test with All on.
 - Nothing lights? Try one at a time: Clock edge = Falling; OE inverted; Latch inverted; Timing pins Always low, then Always high; Slow down = 20.
 - Photograph anything that lights and note which settings were on." },
 
