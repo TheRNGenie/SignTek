@@ -56,7 +56,7 @@
 BluetoothSerial SerialBT;
 #endif
 
-#define FW_VERSION "3.2.1"
+#define FW_VERSION "3.3.0"
 
 constexpr uint16_t CMD_PORT = 3333;
 constexpr uint16_t DISCOVERY_PORT = 3334;
@@ -426,7 +426,8 @@ static void fastDetach() {
 }
 
 // Fills buf with n channel bytes. Returns "" on success or an error message.
-static String laFastCapture(uint8_t* buf, uint32_t& n, uint32_t hz, double& actual) {
+// extPin >= 0: no internal clock; the sign's own clock on that GPIO times the samples (one per tick, edge per extFall).
+static String laFastCapture(uint8_t* buf, uint32_t& n, uint32_t hz, double& actual, int extPin = -1, bool extFall = false) {
   uint32_t bytes = n * 2;                              // 2 samples per 32-bit word (16 bits each)
   const uint32_t CH = 4092;                            // bytes per DMA descriptor (max 4095, word aligned)
   uint32_t nd = (bytes + CH - 1) / CH;
@@ -440,17 +441,20 @@ static String laFastCapture(uint8_t* buf, uint32_t& n, uint32_t hz, double& actu
   }
 
   // Clocks: sample clock on GPIO 16, self-test at hz/6 on GPIO 17. Both come from the same 80 MHz APB clock.
-  if (!ledcAttach(FAST_CLK_PIN, hz, 1) || !ledcAttach(FAST_TEST_PIN, hz / 6, 1)) { fastDetach(); free(dma); free(d); return "could not start the sample clock (LEDC)"; }
-  ledcWrite(FAST_CLK_PIN, 1); ledcWrite(FAST_TEST_PIN, 1);
-  PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[FAST_CLK_PIN]);
-  PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[FAST_TEST_PIN]);
+  bool ext = extPin >= 0;
+  if (!ext) {
+    if (!ledcAttach(FAST_CLK_PIN, hz, 1) || !ledcAttach(FAST_TEST_PIN, hz / 6, 1)) { fastDetach(); free(dma); free(d); return "could not start the sample clock (LEDC)"; }
+    ledcWrite(FAST_CLK_PIN, 1); ledcWrite(FAST_TEST_PIN, 1);
+    PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[FAST_CLK_PIN]);
+    PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[FAST_TEST_PIN]);
+  }
   for (int i = 0; i < 8; i++) { PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[LA_PINS[i]]); esp_rom_gpio_connect_in_signal(LA_PINS[i], I2S0I_DATA_IN0_IDX + i, false); }
-  esp_rom_gpio_connect_in_signal(FAST_TEST_PIN, I2S0I_DATA_IN8_IDX, false);
+  esp_rom_gpio_connect_in_signal(ext ? 0x30 : FAST_TEST_PIN, I2S0I_DATA_IN8_IDX, false);
   for (int i = 9; i < 16; i++) esp_rom_gpio_connect_in_signal(0x30, I2S0I_DATA_IN0_IDX + i, false);   // constant low
   esp_rom_gpio_connect_in_signal(0x38, I2S0I_V_SYNC_IDX, false);      // constant high
   esp_rom_gpio_connect_in_signal(0x38, I2S0I_H_SYNC_IDX, false);
   esp_rom_gpio_connect_in_signal(0x38, I2S0I_H_ENABLE_IDX, false);
-  esp_rom_gpio_connect_in_signal(FAST_CLK_PIN, I2S0I_WS_IN_IDX, false);
+  esp_rom_gpio_connect_in_signal(ext ? extPin : FAST_CLK_PIN, I2S0I_WS_IN_IDX, ext && extFall);
 
   periph_module_enable(PERIPH_I2S0_MODULE);
   I2S0.conf.rx_reset = 1; I2S0.conf.rx_reset = 0;
@@ -480,9 +484,9 @@ static String laFastCapture(uint8_t* buf, uint32_t& n, uint32_t hz, double& actu
   uint32_t t0 = micros();
   I2S0.in_link.start = 1;
   I2S0.conf.rx_start = 1;
-  uint32_t waitUs = (uint32_t)((double)n * 1e6 / hz) * 2 + 3000;   // the capture itself takes n / hz (about 1.5 ms)
+  uint32_t waitUs = ext ? 300000 : (uint32_t)((double)n * 1e6 / hz) * 2 + 3000;   // sign clock: unknown speed, allow up to 0.3 s   // the capture itself takes n / hz (about 1.5 ms)
   volatile uint16_t* last = (volatile uint16_t*)(dma + bytes - 2);
-  while (micros() - t0 < waitUs) { if ((*last & 0xFE00) == 0 && I2S0.int_raw.in_suc_eof) break; }
+  while (micros() - t0 < waitUs) { if ((*last & 0xFE00) == 0) break; }   // DMA writes whole words, so the last half-word filled = done
   uint32_t us = micros() - t0;
   I2S0.conf.rx_start = 0; I2S0.in_link.stop = 1;
   periph_module_disable(PERIPH_I2S0_MODULE);
@@ -498,6 +502,19 @@ static String laFastCapture(uint8_t* buf, uint32_t& n, uint32_t hz, double& actu
   }
   filled &= ~1u;
   n = filled - filled % 6;
+  if (ext) {
+    // No self-test clock here. The 10 MHz self-test on real hardware showed the high half-word comes first.
+    uint16_t* hwx = (uint16_t*)dma;
+    for (uint32_t i = 0; i < n; i++) buf[i] = hwx[i ^ 1] & 0xFF;
+    actual = us ? (double)filled * 1e6 / us : 0;    // ticks per second = the sign's clock
+    char inf[160];
+    snprintf(inf, sizeof inf, ",\"fast\":true,\"sync\":true,\"clock_gpio\":%d,\"edge\":\"%s\",\"filled\":%lu,\"took_us\":%lu,\"clock_hz\":%.0f",
+             extPin, extFall ? "falling" : "rising", (unsigned long)filled, (unsigned long)us, actual);
+    fastInfo = inf;
+    if (filled < n * 9 / 10) fastInfo += ",\"note\":\"clock stopped early\"";
+    free(dma); free(d);
+    return "";
+  }
 
   // Each word holds two 16-bit samples. Use the self-test bit (bit 8) to find their order:
   // a clock at exactly 1/6 of the sample rate must give runs of 3 samples.
@@ -533,6 +550,9 @@ String laCapture(uint32_t n, uint32_t rateHz, int trigCh, int trigEdge) {
   for (int i = 0; i < 8; i++) if (probeFind(LA_PINS[i], false)) return err(String("GPIO ") + LA_PINS[i] + " is a probe output, turn it off first");
   for (int i = 0; i < 8; i++) pinMode(LA_PINS[i], INPUT);
   uint32_t fastHz = rateHz == 2 ? 20000000 : rateHz == 3 ? 10000000 : 0;   // rate 2 / 3 = fast I2S capture at 20 / 10 MHz
+  int syncPin = (rateHz == 4 || rateHz == 5) ? LA_PINS[4] : -1;             // rate 4 / 5 = one sample per tick of the sign clock on channel 5 (rising / falling)
+  bool syncFall = rateHz == 5;
+  if (syncPin >= 0) fastHz = 1;
   bool turbo = rateHz == 1;                          // rate 1 = turbo: raw reads of GPIO 0-31 only (channels 3, 5-8)
   if (turbo) { rateHz = 0; n = min<uint32_t>(n, 16383); }
   n = constrain(n, 1024, 65536); n -= n % 3;        // multiple of 3 keeps base64 simple
@@ -545,8 +565,8 @@ String laCapture(uint32_t n, uint32_t rateHz, int trigCh, int trigEdge) {
     if (!fb) return err("not enough memory for a capture");
     n -= n % 6;
     double act = 0;
-    String e = laFastCapture(fb, n, fastHz, act);
-    if (e.length() && n > 6000) { n = 6000; e = laFastCapture(fb, n, fastHz, act); }   // retry smaller if DMA memory was short
+    String e = laFastCapture(fb, n, fastHz, act, syncPin, syncFall);
+    if (e.length() && n > 6000) { n = 6000; e = laFastCapture(fb, n, fastHz, act, syncPin, syncFall); }   // retry smaller if DMA memory was short
     if (e.length()) { free(fb); return err(e); }
     Stream* o = replyTo;
     o->print("{\"ok\":true,\"cap\":\"");

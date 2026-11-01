@@ -1,6 +1,6 @@
 {
-  "version": "1.4.2",
+  "version": "1.5.0",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8730350,
-  "notes": "- New sign firmware 3.2.1: install it in tab 0. Logic analyzer channel 5 now records the SPI plug pin printed IO21 (it was GPIO 5, which isn't on your board's plugs).\n- Wiring pictures and channel labels now use the names printed next to each plug.\n- Sign OE output default moved from GPIO 5 to IO21.\n- Help: ground-wire check if captures disagree."
+  "size": 8732125,
+  "notes": "- New sign firmware 3.3.0: install it in tab 0.\n- Logic analyzer: new Sync to sign clock speeds. Put the sign's clock (panel pin 16) on channel 5 and the board takes one sample per clock tick (rising or falling edge), and measures the clock speed.\n- Panel help explains it."
 }

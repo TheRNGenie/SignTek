@@ -219,6 +219,13 @@ In tab 1 (Pin mapper), choose Panel 16-pin grey ribbon at the top. It has its ow
 - The board checks itself on every Fast capture: it records its own test clock and makes sure it looks right. If the check fails, the message under the Capture button says so. Press Save my captures as one file (to send) and send it: the file holds the check results.
 - If Fast says it got no data from I2S, use Turbo for now and send the captures file.
 
+## Sync to sign clock (firmware 3.3.0)
+- On Logan's panels, pin 16 carries a steady clock of about 8 MHz that never stops. The panel's other lines change in step with it. Recording faster and faster can't keep up with that cleanly, so this speed uses the sign's own clock to time the recording instead: one sample on every clock tick, with nothing missed.
+- Wire pin 16 to channel 5 (the SPI plug pin printed IO21) and the pins you want to read to the other channels. Ground on pin 15, 1 kΩ resistors as usual.
+- Capture once with rising edge and once with falling edge. One of them reads each data line in the middle of its bit (clean), the other right as it changes (messy). Send both.
+- The message under the Capture button shows the measured clock speed. If it says the clock stopped early, check the pin 16 wire.
+- The time scale in the picture assumes the clock is steady, which it is on this sign.
+
 ## Driving the panels later
 - Measured on Logan's sign: the panels' supply is 5 V (across the big capacitors), but every signal pin is 3.3 V or less and the input chip U2 runs at about 2.4 V (its pin 20). So no level shifter is needed.
 - Wire each ESP32 output to its panel input pin through a 220 Ω resistor (red-red-brown) as a safety margin, and join ESP32 GND to a panel GND pin.

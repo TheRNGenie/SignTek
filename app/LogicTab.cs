@@ -103,7 +103,7 @@ namespace CasinoSignTool
             var orow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
             orow.Controls.Add(new Label { Text = "Speed:", AutoSize = true, Margin = new Padding(0, 7, 2, 0) });
             _rate = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
-            _rate.Items.AddRange(new object[] { "Fastest (finds CLK and DATA)", "1 MHz", "100 kHz (finds rows A, B, C and OE)", "20 kHz (slowest, longest)", "Turbo: 2-3x faster, channels 3, 5, 6, 7, 8 only", "Fast 10 MHz: all 8 channels, exact timing (firmware 3.2.0)" });
+            _rate.Items.AddRange(new object[] { "Fastest (finds CLK and DATA)", "1 MHz", "100 kHz (finds rows A, B, C and OE)", "20 kHz (slowest, longest)", "Turbo: 2-3x faster, channels 3, 5, 6, 7, 8 only", "Fast 10 MHz: all 8 channels, exact timing (firmware 3.2.0)", "Sync to sign clock on channel 5, rising edge (firmware 3.3.0)", "Sync to sign clock on channel 5, falling edge (firmware 3.3.0)" });
             _rate.SelectedIndex = 0;
             orow.Controls.Add(_rate);
             left.Controls.Add(orow);
@@ -279,8 +279,9 @@ namespace CasinoSignTool
             _state.Text = busy.Count == 0 ? "Your map has no sniffed busy pins yet. Type the header pins by hand." : $"Filled empty channels from {busy.Count} busy pins in your map.";
         }
 
-        int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, 4 => 1, 5 => 3, _ => 0 };
-        bool Fast => _rate.SelectedIndex == 5;
+        int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, 4 => 1, 5 => 3, 6 => 4, 7 => 5, _ => 0 };
+        bool Fast => _rate.SelectedIndex >= 5;
+        bool Sync => _rate.SelectedIndex >= 6;
         bool Turbo => _rate.SelectedIndex == 4;
         static readonly int[] TurboChannels = { 2, 4, 5, 6, 7 };   // 0-based: GPIO 25, 21, 18, 19, 23
 
@@ -307,6 +308,12 @@ namespace CasinoSignTool
                     _state.Text = "The board's firmware is too old for Turbo (it recorded very slowly instead). Install the newest firmware in tab 0 (3.1.1 or newer), press Connect, then capture again.";
                     return;
                 }
+                if (Sync && !r.Bool("sync"))
+                {
+                    _state.ForeColor = Color.DarkRed;
+                    _state.Text = "The board's firmware is too old for Sync mode. Install the newest firmware in tab 0 (3.3.0 or newer), press Connect, then capture again.";
+                    return;
+                }
                 if (Fast && !r.Bool("fast"))
                 {
                     _state.ForeColor = Color.DarkRed;
@@ -314,10 +321,10 @@ namespace CasinoSignTool
                     return;
                 }
                 string fastNote = "";
-                if (Fast && r.Str("selftest") != "ok")
+                if (Fast && !Sync && r.Str("selftest") != "ok")
                     fastNote = $" ⚠ Fast mode self-test: {r.Str("selftest")} ({r.Str("selftest_bad_runs")} bad of {r.Str("selftest_checked")}). The recording may be wrong: send the captures file so it can be checked.";
                 _last = Analysis.Run(_data, _sampleRate);
-                AutoSave(r.Str("cap"), Fast ? $"\"fast_selftest\":\"{r.Str("selftest")}\",\"fast_bad_runs\":\"{r.Str("selftest_bad_runs")}\",\"fast_edges\":\"{r.Str("selftest_edges")}\",\"fast_swapped\":\"{r.Str("swapped")}\",\"fast_filled\":\"{r.Str("filled")}\"," : "");
+                AutoSave(r.Str("cap"), Sync ? $"\"sync\":true,\"clock_hz\":\"{r.Str("clock_hz")}\",\"edge\":\"{r.Str("edge")}\",\"filled\":\"{r.Str("filled")}\",\"took_us\":\"{r.Str("took_us")}\"," : Fast ? $"\"fast_selftest\":\"{r.Str("selftest")}\",\"fast_bad_runs\":\"{r.Str("selftest_bad_runs")}\",\"fast_edges\":\"{r.Str("selftest_edges")}\",\"fast_swapped\":\"{r.Str("swapped")}\",\"fast_filled\":\"{r.Str("filled")}\"," : "");
                 for (int i = 0; i < 8; i++) if (_hdr[i].Value > 0) _ctx.Map[(int)_hdr[i].Value].LaChecked = true;
                 _ctx.RaiseMap();
                 if (Turbo)
@@ -328,7 +335,8 @@ namespace CasinoSignTool
                 _state.ForeColor = Color.DarkGreen;
                 _state.Text = $"Captured {_data.Length:N0} samples at {Fmt.Hz(_sampleRate)} ({Fmt.Time(_data.Length / Math.Max(1, _sampleRate))})." +
                               (trigOk ? "" : " The start signal never came, so it recorded right away.") + fastNote;
-                if (fastNote.Length > 0) _state.ForeColor = Color.DarkOrange;
+                if (Sync) fastNote += $" Sign clock measured at {Fmt.Hz(r.Dbl("clock_hz"))} ({r.Str("edge")} edge): one sample per clock tick." + (r.Str("note").Length > 0 ? " ⚠ " + r.Str("note") : "");
+                if (fastNote.Length > 0 && !Sync) _state.ForeColor = Color.DarkOrange;
             }
             catch (Exception ex)
             {
