@@ -182,7 +182,7 @@ namespace CasinoSignTool
                 AutoSize = true, MaximumSize = new Size(760, 0), Padding = new Padding(4),
                 Text = "How to map the header (click a pin, then):\n" +
                        "  Step 1, power OFF, multimeter: beep each pin to the chassis (G) and the 5V rail (V), then to the driver chip legs: MBI5170 pin 2 = DATA, 3 = CLK, 4 = LAT, 13 = OE (? Help has the full steps).\n" +
-                       "  Step 2, safest, CPU-002 still plugged in and running: clip the sniff lead (through a 10k/20k divider, see right) onto a pin and press Sniff. The app suggests what it is. Test the lead first: on a 5V pin (e.g. the first pin of the ESP32's Serial plug) it must read about 100% high.\n" +
+                       "  Step 2, safest, CPU-002 still plugged in and running: clip the sniff lead onto a pin and press Sniff. 3.3 V controller (V-002 measures 3.37 V): lead = one 10k to IO39, nothing to ground. 5 V controller: 10k/20k divider (Show breadboard picture). Test the lead first on a pin at full voltage: it must read about 100% high.\n" +
                        "  Step 3, only if needed, CPU-002 UNPLUGGED: touch the probe lead (through a 1k resistor) to a pin and blink it. Watch the sign to see what reacts.\n" +
                        "Arrow keys move between pins. The map saves itself; use \"Send map to board\" to keep a copy on the ESP32.",
             };
@@ -263,9 +263,12 @@ namespace CasinoSignTool
 
             // ---- Sniff (passive) ----
             side.Controls.Add(H("Sniff the pin (CPU-002 running)"));
-            side.Controls.Add(P("Wire: header pin → 10k → ESP32 sniff GPIO (39 is on the board's IO connector), and a 20k from that GPIO to GND (turns 5V into 3.3V). Common ground between the sign and the ESP32."));
-            var pic = new Button { Text = "Show breadboard picture", AutoSize = true };
-            pic.Click += (s, e) => ShowPicture("sniff-lead.png", "Sniff lead: breadboard wiring");
+            side.Controls.Add(P("3.3 V controller (the V-002 measures 3.37 V): header pin → one 10k → ESP32 GPIO 39 (IO connector), nothing to ground. 5 V controller: add a 20k from GPIO 39 to GND. Always join the grounds."));
+            var pic33 = new Button { Text = "Show whole setup (3.3 V, V-002)", AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
+            pic33.Click += (s, e) => ShowPicture("sniff-setup-3v3.png", "Sniff setup for a 3.3 V controller: both boards");
+            side.Controls.Add(pic33);
+            var pic = new Button { Text = "Show 5 V version (divider)", AutoSize = true };
+            pic.Click += (s, e) => ShowPicture("sniff-lead.png", "Sniff lead for a 5 V controller: breadboard wiring");
             side.Controls.Add(pic);
             var back = new Button { Text = "Show where it plugs into the ESP32", AutoSize = true };
             back.Click += (s, e) => ShowPicture("esp32-back.png", "Back of the ESP32 board: listening-lead wires");
