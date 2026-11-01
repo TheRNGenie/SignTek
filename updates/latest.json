@@ -1,6 +1,6 @@
 {
-  "version": "1.7.4",
+  "version": "1.7.5",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 9118891,
-  "notes": "- New breadboard picture for the permanent wiring (tab 3, Show breadboard picture): same style as the panel test picture, with the real ESP32 plugs and solder pads, two 220 Ω per signal, and both panel headers upright with ground and clock at the bottom.\n- Pins 9 and 13 now share one resistor per row with a short jumper on the header."
+  "size": 9189314,
+  "notes": "- Clearer panel test picture (tab 1c, Show test wiring picture): a big header with each pin's wire written next to it, colour-matched to the ESP32 plug pins, plus a connection table."
 }
