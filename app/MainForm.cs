@@ -105,7 +105,7 @@ namespace CasinoSignTool
             {
                 if (Updater.FirmwareChangedByUpdate())
                 {
-                    _tabs.SelectedIndex = 0;   // tab 0 = Install firmware
+                    GoToTab("0. Install firmware");
                     _status.Text = "Updated to " + Updater.CurrentText + ". This update includes new sign firmware: press Install firmware (USB) or Update over WiFi to put it on the board.";
                 }
                 Updater.CheckInBackground(r => BeginInvoke((Action)(() =>
@@ -184,6 +184,7 @@ namespace CasinoSignTool
             AddTab("Start here", start);
             AddTab("0. Install firmware", new FlashTab(_ctx));
             AddTab("1. Pin mapper", new MapperTab(_ctx));
+            AddTab("1b. Logic analyzer", new LogicTab(_ctx));
             AddTab("2. Sign setup", new SetupTab(_ctx));
             AddTab("3. Wiring guide", new WiringTab(_ctx));
             AddTab("Display", new DisplayTab(_ctx));

@@ -136,3 +136,7 @@ With `mqtt_ha` = 1 the sign publishes Home Assistant discovery for a power switc
 - From the app: `POST http://<sign>/update` (multipart, field `firmware`) with header `X-OTA-Pass: <ota_pass>`.
 - From the Arduino IDE: the sign shows up as a network port (ArduinoOTA, same password).
 - The board's web page at `http://<sign>/` has power, text, play and next buttons for phones.
+
+## CAPTURE (logic analyzer, firmware 3.1.0+)
+`CAPTURE <samples> <rate_hz> <trigger_ch> <edge>` (DIAG mode only). Samples 1024-65536 (rounded down to a multiple of 3), rate 0 = as fast as possible, otherwise at least 10000. Trigger channel -1 = start right away, 0-7 = wait up to 0.1 s for an edge (edge 1 rising, -1 falling, 0 any).
+Reply: `{"ok":true,"cap":"<base64, one byte per sample>","n":N,"rate":<measured samples/s>,"triggered":bool,"pins":[35,39,25,32,5,18,19,23]}`. Bit k of each byte = level of pins[k].

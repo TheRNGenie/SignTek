@@ -30,7 +30,7 @@ namespace CasinoSignTool
                     _buf.Clear();
                     if (line.Length > 0) LineReceived?.Invoke(line);
                 }
-                else if (c != '\r' && _buf.Length < 65536) _buf.Append(c);
+                else if (c != '\r' && _buf.Length < 400000) _buf.Append(c);
             }
         }
         protected void RaiseClosed(string why) => Closed?.Invoke(why);
@@ -198,7 +198,7 @@ namespace CasinoSignTool
         void OnLine(string line)
         {
             if (!line.StartsWith("{")) { lock (_raw) { _raw.Enqueue(line); while (_raw.Count > 6) _raw.Dequeue(); } }
-            bool quiet = line.Contains("\"fb\":");     // live preview polling would flood the console
+            bool quiet = line.Contains("\"fb\":") || line.Contains("\"cap\":");     // live preview polling would flood the console
             if (!quiet) Log?.Invoke(line, false);
             if (!line.StartsWith("{")) return;
             Reply r;

@@ -48,7 +48,7 @@
 BluetoothSerial SerialBT;
 #endif
 
-#define FW_VERSION "3.0.3"
+#define FW_VERSION "3.1.0"
 
 constexpr uint16_t CMD_PORT = 3333;
 constexpr uint16_t DISCOVERY_PORT = 3334;
@@ -390,6 +390,67 @@ SniffResult sniff(int pin, uint32_t ms) {
 }
 
 // ============================================================================
+// Logic analyzer: samples 8 GPIOs at once into RAM, then streams them as base64.
+// Channels (bit 0..7): the free pins on the Freenove board's plugs.
+// ============================================================================
+extern Stream* replyTo;
+const int LA_PINS[8] = {35, 39, 25, 32, 5, 18, 19, 23};
+static const char B64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static inline uint8_t laRead() {
+  uint32_t a = REG_READ(GPIO_IN_REG), b = REG_READ(GPIO_IN1_REG);
+  return ((b >> 3) & 1) | (((b >> 7) & 1) << 1) | (((a >> 25) & 1) << 2) | ((b & 1) << 3) |
+         (((a >> 5) & 1) << 4) | (((a >> 18) & 1) << 5) | (((a >> 19) & 1) << 6) | (((a >> 23) & 1) << 7);
+}
+
+// Streams {"ok":true,"cap":"<base64>" and returns the rest of the JSON line.
+String laCapture(uint32_t n, uint32_t rateHz, int trigCh, int trigEdge) {
+  for (int i = 0; i < 8; i++) if (probeFind(LA_PINS[i], false)) return err(String("GPIO ") + LA_PINS[i] + " is a probe output, turn it off first");
+  for (int i = 0; i < 8; i++) pinMode(LA_PINS[i], INPUT);
+  n = constrain(n, 1024, 65536); n -= n % 3;        // multiple of 3 keeps base64 simple
+  uint8_t* buf = (uint8_t*)malloc(n);
+  if (!buf) { n = 24576; buf = (uint8_t*)malloc(n); }
+  if (!buf) return err("not enough memory for a capture");
+  uint32_t cpu = ESP.getCpuFreqMHz() * 1000000UL;
+  if (rateHz && rateHz < 10000) rateHz = 10000;
+  uint32_t period = rateHz ? cpu / rateHz : 0;       // CPU cycles per sample, 0 = as fast as possible
+  bool triggered = false;
+  // Interrupts off gives even sample timing, but only for short captures (the interrupt watchdog trips at ~300 ms).
+  bool noInt = (double)n * (period ? period : 40) / cpu < 0.12;
+  if (noInt) portDISABLE_INTERRUPTS();
+  uint32_t t0 = ESP.getCycleCount();
+  if (trigCh >= 0 && trigCh < 8) {                   // wait up to ~0.1 s for the trigger edge
+    uint8_t m = 1 << trigCh; bool last = laRead() & m;
+    uint32_t limit = cpu / 10;
+    while (ESP.getCycleCount() - t0 < limit) {
+      bool v = laRead() & m;
+      if (v != last && (trigEdge == 0 || (trigEdge > 0) == v)) { triggered = true; break; }
+      last = v;
+    }
+  }
+  uint32_t start = ESP.getCycleCount(), next = start;
+  if (period == 0) { for (uint32_t i = 0; i < n; i++) buf[i] = laRead(); }
+  else for (uint32_t i = 0; i < n; i++) { while ((int32_t)(ESP.getCycleCount() - next) < 0) {} buf[i] = laRead(); next += period; }
+  uint32_t cycles = ESP.getCycleCount() - start;
+  if (noInt) portENABLE_INTERRUPTS();
+  double actual = cycles ? (double)n * cpu / cycles : 0;
+
+  Stream* o = replyTo;
+  o->print("{\"ok\":true,\"cap\":\"");
+  char chunk[64]; int k = 0;
+  for (uint32_t i = 0; i < n; i += 3) {
+    uint32_t v = (buf[i] << 16) | (buf[i + 1] << 8) | buf[i + 2];
+    chunk[k++] = B64[(v >> 18) & 63]; chunk[k++] = B64[(v >> 12) & 63]; chunk[k++] = B64[(v >> 6) & 63]; chunk[k++] = B64[v & 63];
+    if (k >= 60) { o->write((const uint8_t*)chunk, k); k = 0; }
+  }
+  if (k) o->write((const uint8_t*)chunk, k);
+  free(buf);
+  String tail = "\",\"n\":" + String(n) + ",\"rate\":" + String(actual, 0) + ",\"triggered\":" + (triggered ? "true" : "false") +
+                ",\"pins\":" + intList(LA_PINS, 8) + "}";
+  return tail;
+}
+
+// ============================================================================
 // Settings load/save
 // ============================================================================
 void loadSettings() {
@@ -715,6 +776,15 @@ String handleCommand(String line) {
               .dbl("sample_rate", sps).flag("level", r.level).flag("saturated", hz > sps / 8).done();
   }
 
+  if (cmd == "CAPTURE") {   // CAPTURE <samples> <rate_hz, 0 = max> <trigger channel -1..7> <edge: 1 rise, -1 fall, 0 any>
+    if (runMode != RM_DIAG) return err("switch to DIAG mode first (MODE DIAG)");
+    long n = rest.length() ? nextToken(rest).toInt() : 49152;
+    long rate = rest.length() ? nextToken(rest).toInt() : 0;
+    int trig = rest.length() ? nextToken(rest).toInt() : -1;
+    int edge = rest.length() ? nextToken(rest).toInt() : 1;
+    return laCapture(n, rate, trig, edge);
+  }
+
   if (cmd == "FB") {
     static const char* hx = "0123456789abcdef";
     String s; s.reserve(FB_BYTES * 2);
@@ -828,7 +898,9 @@ void setup() {
   step("loading playlist");
   contentBegin();          // loads the playlist, plays the startup animation
   step("starting WiFi and network");
+#ifndef QEMU_TEST
   netBegin();              // WiFi, web page, TCP port, discovery, OTA, MQTT, time, data fetcher
+#endif
   btApply();
   BOOTLOG("ready");
   drawUi();

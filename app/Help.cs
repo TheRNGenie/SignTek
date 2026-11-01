@@ -128,6 +128,46 @@ While mapping, power the ESP32 from the PC's USB. For the permanent install the 
 ## The LEDs
 The firmware has safety features: a brightness limit (tab 2, Safety max), an automatic 15-second limit on the all-LEDs-on test pattern, and a scan watchdog that blanks the LEDs if the display refresh ever stalls, so a row can't be left stuck on at full power." },
 
+            new HelpTopic { Id = "logic", Title = "Logic analyzer: find CLK, LAT, OE, DATA and rows automatically", Tab = "1b. Logic analyzer",
+                Summary = "Record 8 controller pins at once with the ESP32 and let the app work out which is which.",
+                Body =
+@"# Logic analyzer
+The ESP32 can record 8 pins at the same moment, millions of times a second, and the app then works out from the timing which pin is the clock (CLK), the latch (LAT), blanking (OE), pixel data (DATA) and the row lines (A, B, C, D). This is much faster than sniffing one pin at a time, and it can tell a clock from a data line, which sniffing can't.
+Needs sign firmware 3.1.0 or newer (tab 0).
+
+## Wiring (8 channels)
+Each channel: controller pin > 10 kΩ resistor > ESP32 pin. One extra wire joins ESP32 GND (the GND pin of the I2C plug) to a controller GND pin. This is for 3.3 V controllers like the V-002 (it measures 3.37 V). A 5 V controller needs the 10k/20k divider on every channel instead.
+- Channel 1: GPIO 35, IO plug (the pin your sniff wire is already on).
+- Channel 2: GPIO 39, IO plug, the other pin.
+- Channel 3: GPIO 25, I2C plug, the pin next to GND.
+- Channel 4: GPIO 32, I2C plug, the pin next to 3V3.
+- Channels 5 to 8: GPIO 5, 18, 19, 23: the SPI plug's 4 pins in order (the SD card slot must be empty).
+Tab 1 has Show where it plugs into the ESP32 for a picture of the plugs.
+
+## Using it
+- 1. Type the header pin each channel is clipped to (0 = none), or press Fill header pins with busy pins from my sniff map.
+- 2. Power the sign normally so the controller is running. Connect the ESP32 by USB.
+- 3. Speed Fastest, press Capture. Over USB it takes about 6 seconds to arrive.
+- 4. The Result column and the text box show the guess for each channel, with the reason. Press Put results in the pin map to save them in tab 1.
+- 5. Keep the channels found as CLK and LAT clipped on channels 1 and 2, move the other 6 clips to new busy pins, and capture again. Repeat until every busy pin has been checked.
+- 6. For the row lines (A, B, C) and OE, also capture at 100 kHz: many rows fit into one capture, so the slow on/off pattern is clear.
+
+## How it decides
+- CLK: the busiest line, ticking in bursts with pauses between.
+- DATA: changes during the bursts, in step with the clock.
+- LAT: one very short pulse in each pause, after a burst.
+- OE: switches twice per row, staying mostly in one state.
+- A, B, C, D: change only in the pauses; A once per row, B every 2 rows, C every 4, D every 8.
+- Several DATA lines are normal: big signs feed each panel (or top and bottom half) separately.
+
+## Reading the picture
+Each coloured line is one channel: up = high (3.3 V), down = low. Scroll the mouse wheel to zoom in on a spot, drag to move. A solid block means the line is changing faster than the screen can show; zoom in to see the individual ticks.
+
+## If it finds nothing
+- Nothing moves at all: the controller isn't running, the grounds aren't joined, or the resistors don't reach the right ESP32 pins. Test with the sniff steps in tab 1 first.
+- No clock bursts at Fastest: the clock isn't on any channel yet. Clip other busy pins.
+- The note says the clock is as fast as the ESP32 can record: the guesses are still useful, but a few clock ticks can be missed." },
+
             new HelpTopic { Id = "mapper", Title = "Step 3. Map the 50-pin connector", Tab = "1. Pin mapper",
                 Summary = "Click a pin, test it (multimeter, sniff, or probe), and mark what it is.",
                 Body =
