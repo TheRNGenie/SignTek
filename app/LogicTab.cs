@@ -19,7 +19,7 @@ namespace CasinoSignTool
         public static readonly string[] Where =
         {
             "IO plug (the pin your sniff wire is on)", "IO plug (other pin)", "I2C plug, pin next to GND", "I2C plug, pin next to 3V3",
-            "SPI plug, 1st pin", "SPI plug, 2nd pin", "SPI plug, 3rd pin", "SPI plug, 4th pin",
+            "SPI plug, 1st pin. Pulled high by the SD slot: a pin that isn't driven reads HIGH here", "SPI plug, 2nd pin", "SPI plug, 3rd pin", "SPI plug, 4th pin. Pulled high by the SD slot: a pin that isn't driven reads HIGH here",
         };
         static readonly Color[] TraceColors =
         {
@@ -103,7 +103,7 @@ namespace CasinoSignTool
             var orow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
             orow.Controls.Add(new Label { Text = "Speed:", AutoSize = true, Margin = new Padding(0, 7, 2, 0) });
             _rate = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
-            _rate.Items.AddRange(new object[] { "Fastest (finds CLK and DATA)", "1 MHz", "100 kHz (finds rows A, B, C and OE)", "20 kHz (slowest, longest)", "Turbo: 2-3x faster, channels 3, 5, 6, 7, 8 only" });
+            _rate.Items.AddRange(new object[] { "Fastest (finds CLK and DATA)", "1 MHz", "100 kHz (finds rows A, B, C and OE)", "20 kHz (slowest, longest)", "Turbo: 2-3x faster, channels 3, 5, 6, 7, 8 only", "Fast 20 MHz: all 8 channels (experimental, firmware 3.2.0)", "Fast 10 MHz: all 8 channels (experimental, firmware 3.2.0)" });
             _rate.SelectedIndex = 0;
             orow.Controls.Add(_rate);
             left.Controls.Add(orow);
@@ -212,7 +212,10 @@ namespace CasinoSignTool
             var todo = map.Pins.Where(p => !Skip(p) && p.R != PinRole.NC && !p.LaChecked && !keep.Contains(p.Number))
                               .OrderByDescending(p => p.SniffHz > 0 || VoltsBusy(p)).ThenBy(p => p.Number).Select(p => p.Number).ToList();
             var pick = keep.Concat(todo).Take(8).ToList();
-            for (int i = 0; i < 8; i++) _hdr[i].Value = i < pick.Count ? pick[i] : 0;
+            // Channels 5 and 8 (GPIO 5, 23) are pulled high by the SD slot, so they get pins last.
+            int[] slots = { 0, 1, 2, 3, 5, 6, 4, 7 };
+            for (int i = 0; i < 8; i++) _hdr[i].Value = 0;
+            for (int i = 0; i < pick.Count; i++) _hdr[slots[i]].Value = pick[i];
             _state.ForeColor = SystemColors.ControlText;
             if (todo.Count == 0) _state.Text = "Every pin worth checking has been recorded. " + (keep.Count > 0 ? "CLK/LAT kept on channels 1-2." : "");
             else _state.Text = $"Next to clip: {string.Join(", ", pick.Select((p, i) => $"ch{i + 1}=pin {p}"))}." + (keep.Count > 0 ? " CLK/LAT stay on channels 1-2 so the new pins can be compared against them." : "") + $" {Math.Max(0, todo.Count - (8 - keep.Count))} more pins after this round.";
@@ -221,14 +224,14 @@ namespace CasinoSignTool
         static string CapDir => System.IO.Path.Combine(AppSettings.Dir, "captures");
 
         /// <summary>Every capture is kept on the PC so it can be looked at again or sent for a second opinion.</summary>
-        void AutoSave(string b64)
+        void AutoSave(string b64, string extra = "")
         {
             try
             {
                 System.IO.Directory.CreateDirectory(CapDir);
                 var hdr = string.Join(",", _hdr.Select(h => ((int)h.Value).ToString()));
                 var gp = string.Join(",", Gpios);
-                var json = $"{{\"map\":\"{(_ctx.Map.IsPanel ? "panel16" : "v002")}\",\"time\":\"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\",\"rate\":{_sampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"speed\":\"{_rate.SelectedItem}\",\"gpios\":[{gp}],\"header_pins\":[{hdr}],\"data\":\"{b64}\"}}";
+                var json = $"{{{extra}\"map\":\"{(_ctx.Map.IsPanel ? "panel16" : "v002")}\",\"time\":\"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\",\"rate\":{_sampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"speed\":\"{_rate.SelectedItem}\",\"gpios\":[{gp}],\"header_pins\":[{hdr}],\"data\":\"{b64}\"}}";
                 System.IO.File.WriteAllText(System.IO.Path.Combine(CapDir, $"capture-{DateTime.Now:yyyyMMdd-HHmmss}.json"), json);
             }
             catch { }
@@ -276,7 +279,8 @@ namespace CasinoSignTool
             _state.Text = busy.Count == 0 ? "Your map has no sniffed busy pins yet. Type the header pins by hand." : $"Filled empty channels from {busy.Count} busy pins in your map.";
         }
 
-        int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, 4 => 1, _ => 0 };
+        int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, 4 => 1, 5 => 2, 6 => 3, _ => 0 };
+        bool Fast => _rate.SelectedIndex == 5 || _rate.SelectedIndex == 6;
         bool Turbo => _rate.SelectedIndex == 4;
         static readonly int[] TurboChannels = { 2, 4, 5, 6, 7 };   // 0-based: GPIO 25, 5, 18, 19, 23
 
@@ -286,9 +290,9 @@ namespace CasinoSignTool
             if (_ctx.Mode != "diag" && !await _ctx.SetMode("diag")) { _state.ForeColor = Color.DarkRed; _state.Text = "Couldn't switch the board to Diagnostics mode."; return; }
             _capture.Enabled = false;
             _state.ForeColor = SystemColors.ControlText;
-            int n = Turbo ? 16383 : 49152;
+            int n = Turbo ? 16383 : Fast ? 30000 : 49152;
             int trig = _trig.SelectedIndex - 1;
-            double secs = RateHz == 0 ? 0.02 : (double)n / RateHz;
+            double secs = RateHz <= 3 ? 0.02 : (double)n / RateHz;
             int timeout = (int)(secs * 1000) + (_ctx.Board.OverWifi ? 6000 : 12000);
             _state.Text = _ctx.Board.OverWifi ? "Capturing…" : "Capturing… then sending it over USB (about 6 seconds)";
             try
@@ -303,8 +307,17 @@ namespace CasinoSignTool
                     _state.Text = "The board's firmware is too old for Turbo (it recorded very slowly instead). Install the newest firmware in tab 0 (3.1.1 or newer), press Connect, then capture again.";
                     return;
                 }
+                if (Fast && !r.Bool("fast"))
+                {
+                    _state.ForeColor = Color.DarkRed;
+                    _state.Text = "The board's firmware is too old for Fast mode. Install the newest firmware in tab 0 (3.2.0 or newer), press Connect, then capture again.";
+                    return;
+                }
+                string fastNote = "";
+                if (Fast && r.Str("selftest") != "ok")
+                    fastNote = $" ⚠ Fast mode self-test: {r.Str("selftest")} ({r.Str("selftest_bad_runs")} bad of {r.Str("selftest_checked")}). The recording may be wrong: send the captures file so it can be checked.";
                 _last = Analysis.Run(_data, _sampleRate);
-                AutoSave(r.Str("cap"));
+                AutoSave(r.Str("cap"), Fast ? $"\"fast_selftest\":\"{r.Str("selftest")}\",\"fast_bad_runs\":\"{r.Str("selftest_bad_runs")}\",\"fast_edges\":\"{r.Str("selftest_edges")}\",\"fast_swapped\":\"{r.Str("swapped")}\",\"fast_filled\":\"{r.Str("filled")}\"," : "");
                 for (int i = 0; i < 8; i++) if (_hdr[i].Value > 0) _ctx.Map[(int)_hdr[i].Value].LaChecked = true;
                 _ctx.RaiseMap();
                 if (Turbo)
@@ -314,7 +327,8 @@ namespace CasinoSignTool
                 ShowResults();
                 _state.ForeColor = Color.DarkGreen;
                 _state.Text = $"Captured {_data.Length:N0} samples at {Fmt.Hz(_sampleRate)} ({Fmt.Time(_data.Length / Math.Max(1, _sampleRate))})." +
-                              (trigOk ? "" : " The start signal never came, so it recorded right away.");
+                              (trigOk ? "" : " The start signal never came, so it recorded right away.") + fastNote;
+                if (fastNote.Length > 0) _state.ForeColor = Color.DarkOrange;
             }
             catch (Exception ex)
             {

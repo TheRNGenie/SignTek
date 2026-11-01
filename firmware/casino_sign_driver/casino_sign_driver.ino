@@ -34,6 +34,14 @@
 #include <time.h>
 #include "esp_timer.h"
 #include "soc/gpio_reg.h"
+#include "soc/i2s_struct.h"
+#include "soc/gpio_sig_map.h"
+#include "soc/io_mux_reg.h"
+#include "soc/gpio_periph.h"
+#include "esp_rom_gpio.h"
+#include "esp32/rom/lldesc.h"
+#include "esp_private/periph_ctrl.h"
+#include "esp_heap_caps.h"
 #include "sign_types.h"
 #include "corvette_anim.h"     // built-in Corvette launch animation (installed to storage on first boot)
 
@@ -48,7 +56,7 @@
 BluetoothSerial SerialBT;
 #endif
 
-#define FW_VERSION "3.1.1"
+#define FW_VERSION "3.2.0"
 
 constexpr uint16_t CMD_PORT = 3333;
 constexpr uint16_t DISCOVERY_PORT = 3334;
@@ -403,13 +411,155 @@ static inline uint8_t laRead() {
          (((a >> 5) & 1) << 4) | (((a >> 18) & 1) << 5) | (((a >> 19) & 1) << 6) | (((a >> 23) & 1) << 7);
 }
 
+// ---- Fast capture: the I2S peripheral in "camera" mode samples all 8 channels in hardware ----
+// The sample clock comes from LEDC on GPIO 16 and is looped back into I2S as its pixel clock.
+// A self-test clock at exactly 1/6 of the sample rate runs on GPIO 17 and is recorded on I2S data bit 8,
+// so the firmware can check the result and work out the order of the two samples in each 32-bit word.
+// GPIO 16 and 17 are the RGB LED pads on the Freenove board: the LED flickers during a fast capture.
+static const int FAST_CLK_PIN = 16, FAST_TEST_PIN = 17;
+static String fastInfo;   // extra JSON for the reply
+
+static void fastDetach() {
+  ledcDetach(FAST_CLK_PIN); ledcDetach(FAST_TEST_PIN);
+  pinMode(FAST_CLK_PIN, OUTPUT); digitalWrite(FAST_CLK_PIN, HIGH);    // RGB LED is active low: HIGH = off
+  pinMode(FAST_TEST_PIN, OUTPUT); digitalWrite(FAST_TEST_PIN, HIGH);
+}
+
+// Fills buf with n channel bytes. Returns "" on success or an error message.
+static String laFastCapture(uint8_t* buf, uint32_t& n, uint32_t hz, double& actual) {
+  uint32_t bytes = n * 2;                              // 2 samples per 32-bit word (16 bits each)
+  const uint32_t CH = 4092;                            // bytes per DMA descriptor (max 4095, word aligned)
+  uint32_t nd = (bytes + CH - 1) / CH;
+  uint8_t* dma = (uint8_t*)heap_caps_malloc(bytes, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+  lldesc_t* d = (lldesc_t*)heap_caps_calloc(nd, sizeof(lldesc_t), MALLOC_CAP_DMA);
+  if (!dma || !d) { free(dma); free(d); return "not enough memory for a fast capture"; }
+  for (uint32_t i = 0; i < nd; i++) {
+    uint32_t sz = min(CH, bytes - i * CH);
+    d[i].size = sz; d[i].length = sz; d[i].buf = dma + i * CH; d[i].owner = 1; d[i].sosf = 1; d[i].eof = 1; d[i].offset = 0;
+    d[i].qe.stqe_next = (i + 1 < nd) ? &d[i + 1] : NULL;
+  }
+
+  // Clocks: sample clock on GPIO 16, self-test at hz/6 on GPIO 17. Both come from the same 80 MHz APB clock.
+  if (!ledcAttach(FAST_CLK_PIN, hz, 1) || !ledcAttach(FAST_TEST_PIN, hz / 6, 1)) { fastDetach(); free(dma); free(d); return "could not start the sample clock (LEDC)"; }
+  ledcWrite(FAST_CLK_PIN, 1); ledcWrite(FAST_TEST_PIN, 1);
+  PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[FAST_CLK_PIN]);
+  PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[FAST_TEST_PIN]);
+  for (int i = 0; i < 8; i++) { PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[LA_PINS[i]]); esp_rom_gpio_connect_in_signal(LA_PINS[i], I2S0I_DATA_IN0_IDX + i, false); }
+  esp_rom_gpio_connect_in_signal(FAST_TEST_PIN, I2S0I_DATA_IN8_IDX, false);
+  for (int i = 9; i < 16; i++) esp_rom_gpio_connect_in_signal(0x30, I2S0I_DATA_IN0_IDX + i, false);   // constant low
+  esp_rom_gpio_connect_in_signal(0x38, I2S0I_V_SYNC_IDX, false);      // constant high
+  esp_rom_gpio_connect_in_signal(0x38, I2S0I_H_SYNC_IDX, false);
+  esp_rom_gpio_connect_in_signal(0x38, I2S0I_H_ENABLE_IDX, false);
+  esp_rom_gpio_connect_in_signal(FAST_CLK_PIN, I2S0I_WS_IN_IDX, false);
+
+  periph_module_enable(PERIPH_I2S0_MODULE);
+  I2S0.conf.rx_reset = 1; I2S0.conf.rx_reset = 0;
+  I2S0.conf.rx_fifo_reset = 1; I2S0.conf.rx_fifo_reset = 0;
+  I2S0.lc_conf.in_rst = 1; I2S0.lc_conf.in_rst = 0;
+  I2S0.lc_conf.ahbm_fifo_rst = 1; I2S0.lc_conf.ahbm_fifo_rst = 0;
+  I2S0.lc_conf.ahbm_rst = 1; I2S0.lc_conf.ahbm_rst = 0;
+  I2S0.conf.rx_slave_mod = 1;
+  I2S0.conf.rx_right_first = 0; I2S0.conf.rx_msb_right = 0; I2S0.conf.rx_msb_shift = 0;
+  I2S0.conf.rx_mono = 0; I2S0.conf.rx_short_sync = 0;
+  I2S0.conf2.lcd_en = 1; I2S0.conf2.camera_en = 1;
+  I2S0.clkm_conf.clka_en = 0; I2S0.clkm_conf.clkm_div_a = 1; I2S0.clkm_conf.clkm_div_b = 0; I2S0.clkm_conf.clkm_div_num = 2;
+  I2S0.fifo_conf.dscr_en = 1;
+  I2S0.fifo_conf.rx_fifo_mod = 1;                      // 16-bit samples, two per word
+  I2S0.fifo_conf.rx_fifo_mod_force_en = 1;
+  I2S0.conf_chan.rx_chan_mod = 1;
+  I2S0.sample_rate_conf.rx_bits_mod = 0;
+  I2S0.timing.val = 0;
+  I2S0.timing.rx_dsync_sw = 1;
+  I2S0.rx_eof_num = bytes / 4;
+  I2S0.in_link.addr = (uint32_t)&d[0];
+  I2S0.int_clr.val = 0xFFFFFFFF;
+
+  // Real samples always have bits 9-15 clear (those inputs are tied low), so pre-fill with 0xFF
+  // and afterwards count how much of the buffer the DMA actually wrote.
+  memset(dma, 0xFF, bytes);
+  uint32_t t0 = micros();
+  I2S0.in_link.start = 1;
+  I2S0.conf.rx_start = 1;
+  uint32_t waitUs = (uint32_t)((double)n * 1e6 / hz) * 2 + 3000;   // the capture itself takes n / hz (about 1.5 ms)
+  volatile uint16_t* last = (volatile uint16_t*)(dma + bytes - 2);
+  while (micros() - t0 < waitUs) { if ((*last & 0xFE00) == 0 && I2S0.int_raw.in_suc_eof) break; }
+  uint32_t us = micros() - t0;
+  I2S0.conf.rx_start = 0; I2S0.in_link.stop = 1;
+  periph_module_disable(PERIPH_I2S0_MODULE);
+  fastDetach();
+  for (int i = 0; i < 8; i++) pinMode(LA_PINS[i], INPUT);   // back to plain GPIO inputs
+  uint16_t* hw0 = (uint16_t*)dma;
+  uint32_t filled = n;
+  while (filled > 0 && (hw0[filled - 1] & 0xFE00)) filled--;
+  if (filled < 600) {
+    char h[96]; uint32_t* w = (uint32_t*)dma; snprintf(h, sizeof h, "%08lx %08lx %08lx %08lx", (unsigned long)w[0], (unsigned long)w[1], (unsigned long)w[2], (unsigned long)w[3]);
+    free(dma); free(d);
+    return String("fast capture got no data from I2S (") + filled + " samples). First words: " + h;
+  }
+  filled &= ~1u;
+  n = filled - filled % 6;
+
+  // Each word holds two 16-bit samples. Use the self-test bit (bit 8) to find their order:
+  // a clock at exactly 1/6 of the sample rate must give runs of 3 samples.
+  uint16_t* hw = (uint16_t*)dma;
+  uint32_t badA = 0, badB = 0, runA = 0, runB = 0, edgesA = 0;
+  int lastA = -1, lastB = -1;
+  uint32_t check = min<uint32_t>(n, 6000);
+  for (uint32_t i = 0; i < check; i++) {
+    int a = (hw[i] >> 8) & 1;                  // order A: low half first
+    int b = (hw[i ^ 1] >> 8) & 1;              // order B: high half first
+    if (a == lastA) runA++; else { if (lastA >= 0 && i > 8 && runA != 3) badA++; if (lastA >= 0) edgesA++; runA = 1; lastA = a; }
+    if (b == lastB) runB++; else { if (lastB >= 0 && i > 8 && runB != 3) badB++; runB = 1; lastB = b; }
+  }
+  bool swap = badB < badA;
+  uint32_t bad = swap ? badB : badA;
+  for (uint32_t i = 0; i < n; i++) buf[i] = hw[swap ? (i ^ 1) : i] & 0xFF;
+  char inf[160];
+  snprintf(inf, sizeof inf, ",\"fast\":true,\"filled\":%lu,", (unsigned long)filled);
+  fastInfo = inf;
+  snprintf(inf, sizeof inf, "\"selftest_bad_runs\":%lu,\"selftest_checked\":%lu,\"selftest_edges\":%lu,\"swapped\":%s,\"took_us\":%lu",
+           (unsigned long)bad, (unsigned long)check, (unsigned long)edgesA, swap ? "true" : "false", (unsigned long)us);
+  fastInfo += inf;
+  actual = hz;
+  if (edgesA < 10) fastInfo += ",\"selftest\":\"no clock seen on bit 8\"";
+  else if (bad > check / 60) fastInfo += ",\"selftest\":\"irregular\"";
+  else fastInfo += ",\"selftest\":\"ok\"";
+  free(dma); free(d);
+  return "";
+}
+
 // Streams {"ok":true,"cap":"<base64>" and returns the rest of the JSON line.
 String laCapture(uint32_t n, uint32_t rateHz, int trigCh, int trigEdge) {
   for (int i = 0; i < 8; i++) if (probeFind(LA_PINS[i], false)) return err(String("GPIO ") + LA_PINS[i] + " is a probe output, turn it off first");
   for (int i = 0; i < 8; i++) pinMode(LA_PINS[i], INPUT);
+  uint32_t fastHz = rateHz == 2 ? 20000000 : rateHz == 3 ? 10000000 : 0;   // rate 2 / 3 = fast I2S capture at 20 / 10 MHz
   bool turbo = rateHz == 1;                          // rate 1 = turbo: raw reads of GPIO 0-31 only (channels 3, 5-8)
   if (turbo) { rateHz = 0; n = min<uint32_t>(n, 16383); }
   n = constrain(n, 1024, 65536); n -= n % 3;        // multiple of 3 keeps base64 simple
+  fastInfo = "";
+  if (fastHz) {
+    if (probeFind(FAST_CLK_PIN, false) || probeFind(FAST_TEST_PIN, false)) return err("GPIO 16/17 are probe outputs, turn them off first");
+    n = min<uint32_t>(n, 30000); n -= n % 6;
+    uint8_t* fb = nullptr;
+    while (n >= 3000 && !(fb = (uint8_t*)malloc(n))) n /= 2;
+    if (!fb) return err("not enough memory for a capture");
+    n -= n % 6;
+    double act = 0;
+    String e = laFastCapture(fb, n, fastHz, act);
+    if (e.length() && n > 6000) { n = 6000; e = laFastCapture(fb, n, fastHz, act); }   // retry smaller if DMA memory was short
+    if (e.length()) { free(fb); return err(e); }
+    Stream* o = replyTo;
+    o->print("{\"ok\":true,\"cap\":\"");
+    char chunk[64]; int k = 0;
+    for (uint32_t i = 0; i < n; i += 3) {
+      uint32_t v = (fb[i] << 16) | (fb[i + 1] << 8) | fb[i + 2];
+      chunk[k++] = B64[(v >> 18) & 63]; chunk[k++] = B64[(v >> 12) & 63]; chunk[k++] = B64[(v >> 6) & 63]; chunk[k++] = B64[v & 63];
+      if (k >= 60) { o->write((const uint8_t*)chunk, k); k = 0; }
+    }
+    if (k) o->write((const uint8_t*)chunk, k);
+    free(fb);
+    return "\",\"n\":" + String(n) + ",\"rate\":" + String(act, 0) + ",\"triggered\":false,\"turbo\":false" + fastInfo + ",\"pins\":" + intList(LA_PINS, 8) + "}";
+  }
   uint8_t* buf = (uint8_t*)malloc(turbo ? n * 4 : n);
   if (!buf) { n = 24576; buf = (uint8_t*)malloc(n); }
   if (!buf) return err("not enough memory for a capture");
