@@ -1,6 +1,6 @@
 {
-  "version": "1.7.6",
+  "version": "1.7.7",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 9197961,
-  "notes": "- Header pictures flipped to match the beep test: looking at the header, ground (15) is bottom-RIGHT, clock (16) bottom-left, odd pins in the right column.\n- Clearer panel test picture: a big header with each pin's wire written next to it, plus a connection table."
+  "size": 9134382,
+  "notes": "- Panel test picture now traces every wire: ESP32 plug pin, through its 220 Ω on the breadboard, to its header pin, with the GND rail and the row C resistor shown."
 }
