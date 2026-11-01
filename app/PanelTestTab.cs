@@ -55,7 +55,7 @@ namespace CasinoSignTool
             left.Controls.Add(H("Wiring (sign unplugged)"));
             left.Controls.Add(P(
                 "1. Leave the grey ribbon between panel 1 and panel 2 unplugged, and leave the row processors in.\n" +
-                "2. Wire to the SECOND panel's INPUT header: where the other end of that ribbon plugged in. Do NOT use the header next to U34, U24 and U29: that is panel 1's output, it is already driven and the two would fight.\n" +
+                "2. Wire to the SECOND panel's INPUT header: the LEFT header of the pair (next to U2 and U3), where the other end of that ribbon plugged in. Same layout as the right-hand header: pins 1 and 2 at the bottom (red-stripe side), 15 and 16 at the top. Check the column first: sign off, beep the two top pins to the big capacitor's minus leg; the one that beeps is pin 15. Do NOT use the header next to U34, U24 and U29: that is panel 1's output, it is already driven and the two would fight.\n" +
                 "3. Each signal: ESP32 pin → one 220 Ω resistor (red-red-brown) → panel pin. Ground: ESP32 GND → panel pin 15, no resistor.\n" +
                 "4. No 10 kΩ on OE for this test.\n" +
                 "5. The first 7 rows below (pins 16, 6, 5, 3, 4, 1, 7) are enough to start. The ESP32's plugs give 6 outputs (IO18, 19, 21, 23, 32, 25; IO35 and IO39 can only listen), so for the first test wire pin 1 (row C) to GND through a 220 Ω: only half the rows light, which is enough. The other rows need soldering to board pads; add them only when needed."));

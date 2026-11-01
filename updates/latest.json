@@ -1,6 +1,6 @@
 {
-  "version": "1.7.0",
+  "version": "1.7.1",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 9031069,
-  "notes": "- New sign firmware 3.4.0: install it in tab 0.\n- New tab 1c. Panel test: the ESP32 sends test patterns straight into panel 2's input, so we can check the signal format on the real panels. Wiring table, picture and steps are in the tab.\n- The OE pull-up in the final wiring is now optional until the panel test shows which way round it goes."
+  "size": 8991358,
+  "notes": "- Panel test wiring picture redrawn: panel 2's input header shown upright as in the photo (pins 1 and 2 at the bottom, red-stripe side), with a beep check for the column.\n- Includes firmware 3.4.0 and tab 1c. Panel test from 1.7.0."
 }
