@@ -1,6 +1,6 @@
 {
-  "version": "1.6.0",
+  "version": "1.7.0",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8788442,
-  "notes": "- Wiring guide (tab 3) redone for the real plan: the ESP32 drives the first panel of BOTH rows through the 16-pin connectors, every signal split equally with one 220 ohm resistor per row. New breadboard picture.\n- All 50-pin / V-002 options and instructions removed. The pin mapper only maps the 16-pin panel connector.\n- New pictures for the logic analyzer and sniff lead (panel connector, 1 kOhm, ground on pin 15).\n- Help updated with everything found so far: rows A/B/C on pins 3/4/1, OE 5, latch 6, clock 16, pixel data on pin 7."
+  "size": 9031069,
+  "notes": "- New sign firmware 3.4.0: install it in tab 0.\n- New tab 1c. Panel test: the ESP32 sends test patterns straight into panel 2's input, so we can check the signal format on the real panels. Wiring table, picture and steps are in the tab.\n- The OE pull-up in the final wiring is now optional until the panel test shows which way round it goes."
 }

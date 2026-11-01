@@ -213,6 +213,7 @@ namespace CasinoSignTool
             AddTab("0. Install firmware", new FlashTab(_ctx));
             AddTab("1. Pin mapper", new MapperTab(_ctx));
             AddTab("1b. Logic analyzer", new LogicTab(_ctx));
+            AddTab("1c. Panel test", new PanelTestTab(_ctx));
             AddTab("2. Sign setup", new SetupTab(_ctx));
             AddTab("3. Wiring guide", new WiringTab(_ctx));
             AddTab("Display", new DisplayTab(_ctx));

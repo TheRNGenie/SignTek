@@ -48,7 +48,7 @@ After the one-time setup, everything is wireless: this app finds the sign on you
 - Two 16-pin (2 x 8) IDC ribbon cables with plugs, one for each panel row. The short grey ribbons that join the panels are exactly this kind; a spare one or a new 16-pin IDC cable works.
 - A small breadboard or perfboard to make the split, and jumper wires (male-to-female are handiest).
 - 220 Ω resistors (red-red-brown), two for every signal: one for each panel connector. The wiring guide (tab 3) shows the count.
-- One 10 kΩ resistor (keeps the LEDs dark while the ESP32 starts).
+- Optional: one 10 kΩ resistor (can keep the LEDs dark while the ESP32 starts, once the panel test shows which way round).
 - A multimeter with a continuity beeper.
 
 ## For pin mapping
@@ -226,6 +226,42 @@ The plan: the ESP32 replaces both row processors and feeds the 16-pin input of t
 - The panels' supply is 5 V (across the big capacitors), but every signal pin is 3.3 V or less and the input chip U2 runs at about 2.4 V (its pin 20). So no level shifter is needed.
 - Tab 3 (Wiring guide) shows the final wiring: each ESP32 output splits into two 220 Ω resistors, one to each row's panel connector." },
 
+            new HelpTopic { Id = "paneltest", Title = "Panel test: drive panel 2 from the ESP32", Tab = "1c. Panel test",
+                Summary = "Send test patterns from the ESP32 into panel 2's input to check the signal format (firmware 3.4.0).",
+                Body =
+@"# Panel test: drive panel 2 from the ESP32
+The recordings showed how the row processor talks to the panels. This test does the same from the ESP32 with simple patterns, so we can check it on the real panels before building the full display driver. Panel 1 keeps showing the row processor's message; panel 2 and the panels after it show the ESP32's pattern.
+Needs sign firmware 3.4.0 or newer (tab 0).
+
+## Wiring (sign unplugged)
+- Leave the grey ribbon between panel 1 and panel 2 unplugged, and leave both row processors in.
+- Wire to the SECOND panel's INPUT header: where the other end of that ribbon plugged in.
+! Do NOT wire to the header next to U34, U24 and U29. That is panel 1's output; it is already driven and the two would fight.
+- Each signal: ESP32 pin > 220 Ω resistor (red-red-brown) > panel pin. Ground: ESP32 GND (I2C plug) > panel pin 15, no resistor. No 10 kΩ on OE for this test.
+- Pin 16 CLK > GPIO 18 (SPI plug IO18). Pin 6 LAT > GPIO 19 (SPI IO19). Pin 5 OE > GPIO 21 (SPI IO21).
+- Pin 3 row A > GPIO 32 (I2C IO32). Pin 4 row B > GPIO 25 (I2C IO25). Pin 1 row C: for the first test, 220 Ω to GND (no soldering; only half the rows light). Later > GPIO 0 (BOOT button pad).
+- Pin 7 data 1 > GPIO 23 (SPI IO23). Pin 8 data 2 > GPIO 22 (RGB LED pad). Pin 10 data 3 > GPIO 17 (RGB LED pad). Pin 11 data 4 > GPIO 26 (speaker pad).
+- Pins 9 and 13 together > GPIO 16 (RGB LED pad). Pin 2 > GPIO 4 (speaker pad). Pins 12 and 14: leave unconnected.
+> Pins 16, 6, 5, 3, 4, 1 and 7 are enough to start. The ESP32's plugs give 6 outputs (IO18, 19, 21, 23, 32, 25; IO35 and IO39 can only listen), so everything else needs soldering to board pads. Add those only when a step asks for them.
+
+## Running it
+- Plug the sign in, connect the ESP32 (top bar), open tab 1c and press Start test. Start with All on and only the pin 7 data line ticked.
+- Every change on the right is sent straight away while the test runs. Stop ends it and lets go of the pins.
+
+## What to look for
+- All on: panel 2 onward should light. Tick one data line at a time: the colour you see is the colour that line carries.
+- One bit with the bit buttons: a single dot or column moves. Note which column each bit number lands in and which way it moves.
+- Only row: one row address at a time, to check A, B and C.
+- Checker: a chess-board. Stripes instead mean the bits are out of step.
+- Write down (or photograph) what each test shows.
+
+## If nothing lights
+- Check ground (pin 15) and that you used panel 2's input header.
+- Tick OE inverted. Then try Latch inverted.
+- Wire pins 9+13 and 2 and set Timing pins to Always low, then Always high.
+- Set Slow down to 50: the ESP32 then sends the clock more slowly, in case the wires are too long for full speed.
+- If the board says it doesn't know PTEST, install firmware 3.4.0 or newer in tab 0." },
+
             new HelpTopic { Id = "setup", Title = "Step 4. Sign setup and first light", Tab = "2. Sign setup",
                 Summary = "Pick an ESP32 GPIO for each signal, set the scan type, Apply, check the test patterns, Save.",
                 Body =
@@ -270,7 +306,7 @@ The sign pins are on the board's SPI plug (IO23, IO19, IO18, IO21) and I2C plug 
 - Plug a 16-pin ribbon into the input header of the first panel of each row (where the row processor sat). Red stripe = pin 1.
 - On the breadboard, give each signal one row. The ESP32 wire goes into that row, and two 220 Ω resistors go out of it: one to the Row 1 ribbon pin, one to the Row 2 ribbon pin. Tick each checkbox as you go.
 - Ground: ESP32 GND to pin 15 of BOTH ribbons.
-- The 10 kΩ goes from the OE GPIO to 3.3 V, so the LEDs stay dark while the ESP32 starts.
+- A 10 kΩ on the OE GPIO can keep the LEDs dark while the ESP32 starts. Which way it goes (to GND or 3.3 V) depends on the OE polarity, which the panel test (tab 1c) shows. Leave it out until then.
 - Leave every pin the guide lists as unused unconnected.
 
 ## Before turning it on

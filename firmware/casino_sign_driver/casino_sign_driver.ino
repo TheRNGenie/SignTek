@@ -56,7 +56,7 @@
 BluetoothSerial SerialBT;
 #endif
 
-#define FW_VERSION "3.3.0"
+#define FW_VERSION "3.4.0"
 
 constexpr uint16_t CMD_PORT = 3333;
 constexpr uint16_t DISCOVERY_PORT = 3334;
@@ -842,6 +842,7 @@ bool parseHexFrame(const String& hex, uint8_t* out) {
 }
 
 void setRunMode(RunMode m) {
+  ptStop();
   if (m == RM_DIAG) { stopScan(); probeAllOff(); releaseSignPins(); runMode = RM_DIAG; }
   else { probeAllOff(); runMode = RM_RUN; startScan(); }
   uiDirty = true;
@@ -945,6 +946,8 @@ String handleCommand(String line) {
     if (e.length()) return err(e);
     return J().num("gpio", pin).str("probe", what).dbl("hz", hz).num("ms", ms ? ms : probeTimeoutMs).done();
   }
+
+  if (cmd == "PTEST") return panelTestCommand(rest);
 
   if (cmd == "ALLOFF") { probeAllOff(); return J().str("probe", "all off").done(); }
 
