@@ -33,7 +33,7 @@ namespace CasinoSignTool
         public void RaiseMap() { MapChanged?.Invoke(); try { System.IO.Directory.CreateDirectory(AppSettings.Dir); Map.Save(AppSettings.MapPath(Map.Kind)); } catch { } }
         public void RaiseCfg() => CfgChanged?.Invoke();
 
-        /// <summary>Load the saved map for "v002" (50-pin) or "panel20" (20-pin panel connector).</summary>
+        /// <summary>Load the saved map for "v002" (50-pin) or "panel20" (16-pin panel connector).</summary>
         public HeaderMap LoadMap(string kind)
         {
             try
@@ -42,7 +42,7 @@ namespace CasinoSignTool
                 if (System.IO.File.Exists(path))
                 {
                     var m = HeaderMap.Load(path);
-                    if (kind == "panel20") { m.Kind = "panel20"; if (m.PinCount != 20) return HeaderMap.NewPanel(); }
+                    if (kind == "panel20") { m.Kind = "panel20"; if (m.PinCount != 16) { m.PinCount = 16; m.EnsurePins(); } }
                     return m;
                 }
             }

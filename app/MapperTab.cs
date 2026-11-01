@@ -189,7 +189,7 @@ namespace CasinoSignTool
             var top = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Dock = DockStyle.Fill };
             var chooser = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
             chooser.Controls.Add(new Label { Text = "Which connector are you mapping?", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(4, 6, 8, 0) });
-            _rbPanel = new RadioButton { Text = "Panel 20-pin grey ribbon (current plan)", AutoSize = true };
+            _rbPanel = new RadioButton { Text = "Panel 16-pin grey ribbon (current plan)", AutoSize = true };
             _rbV002 = new RadioButton { Text = "V-002 50-pin (old plan)", AutoSize = true };
             _rbPanel.CheckedChanged += (s, e) => { if (_rbPanel.Checked && !_loading) _ctx.SwitchMap("panel20"); };
             _rbV002.CheckedChanged += (s, e) => { if (_rbV002.Checked && !_loading) _ctx.SwitchMap("v002"); };
@@ -380,7 +380,7 @@ namespace CasinoSignTool
             _rbPanel.Checked = _ctx.Map.IsPanel; _rbV002.Checked = !_ctx.Map.IsPanel;
             _loading = false;
             _steps.Text = _ctx.Map.IsPanel
-                ? "Panel 20-pin connector (the grey ribbon between two panels). The signal enters at the right end of each row and moves left.\n" +
+                ? "Panel 16-pin connector (the grey ribbon between two panels). The signal enters at the right end of each row and moves left.\n" +
                   "  Step 1, sign ON, ribbon between two panels pulled off: measure each pin of the RIGHT-hand header (next to U34, U24, U29; it is the output of the right panel and still driven). Black probe on the minus leg (striped side) of a big 1000µF capacitor. Type each reading in the Voltage box and press Enter to move to the next pin.\n" +
                   "  Step 2, sign OFF: beep each pin to the capacitor minus leg. Beeps = GND.\n" +
                   "  Step 3: Logic analyzer tab. Record the busy pins (readings between about 0.5 V and 4.5 V) with the sign running. Only connect the ESP32 if no pin reads above 3.6 V, or use a level shifter (? Panel steps).\n" +

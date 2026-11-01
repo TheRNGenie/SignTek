@@ -169,28 +169,34 @@ Each coloured line is one channel: up = high (3.3 V), down = low. Scroll the mou
 - No clock bursts at Fastest: the clock isn't on any channel yet. Clip other busy pins.
 - The note says the clock is as fast as the ESP32 can record: the guesses are still useful, but a few clock ticks can be missed." },
 
-            new HelpTopic { Id = "panel", Title = "Map the 20-pin panel connector (current plan)", Tab = null,
+            new HelpTopic { Id = "panel", Title = "Map the 16-pin panel connector (current plan)", Tab = null,
                 Summary = "Find out what each pin of the grey ribbon between two panels carries, so the ESP32 can drive the panels directly.",
                 Body =
-@"# Map the 20-pin panel connector
+@"# Map the 16-pin panel connector
 ## Why this connector
-Inside the sign, the LED Display Processor (V-002) talks to two Advanced Row Processor boards, one on top of the first panel of each row. Each row processor drives its row of RGB panels through a 20-pin connector, and the panels pass the signal on to each other with short grey 20-pin ribbons. The signal enters at the right end of each row and moves left.
+Inside the sign, the LED Display Processor (V-002) talks to two Advanced Row Processor boards, one on top of the first panel of each row. Each row processor drives its row of RGB panels through a 16-pin connector, and the panels pass the signal on to each other with short grey 16-pin ribbons. The signal enters at the right end of each row and moves left.
 Each panel buffers its input with two 74HC244 chips (U2, U3) and feeds it to Neurizon's own programmable chip (labelled RGB02-01-PLD). The output to the next panel comes from U34, U24 and U29. Because the format is Neurizon's own, it has to be recorded from a running sign; it can't be looked up.
 The plan: the ESP32 replaces the V-002 and both row processors and plugs into where the row processor fed the first panel. Leave the row processors in until the map is finished: while they run, they show us the real signals.
-In tab 1 (Pin mapper), choose Panel 20-pin grey ribbon at the top. It has its own map, separate from the 50-pin one.
+In tab 1 (Pin mapper), choose Panel 16-pin grey ribbon at the top. It has its own map, separate from the 50-pin one.
 
 ## Step 1. Voltages (sign on)
 ! Mains power is inside the case. Keep hands and probes away from the power supply and its terminals.
 - 1. Sign OFF. Pull off the grey ribbon between the first panel (the one with the row processor on top) and the next panel. Note which side has the red stripe: that is pin 1.
 - 2. Find pin 1 on the RIGHT-hand header (the one next to U34, U24, U29; it is the first panel's output). Look for a small triangle or a 1 printed beside it.
 - 3. Sign ON. Multimeter on DC volts (20 V range). Black probe on the minus leg of one of the big black 1000 µF capacitors: the leg on the striped side.
-- 4. In tab 1, click pin 1. Touch the red probe to pin 1, type the reading in the Voltage box and press Enter: the app moves to pin 2. Do all 20.
+- 4. In tab 1, click pin 1. Touch the red probe to pin 1, type the reading in the Voltage box and press Enter: the app moves to pin 2. Do all 16.
 > Reading meanings: about 0 V = ground or a line sitting low. About 3.3 V or 5 V = power or a line sitting high. Anything in between = a busy signal line (a multimeter shows the average of a fast on/off signal).
 
 ## Step 2. Ground pins (sign off)
 - 1. Sign OFF. Multimeter on the beep (continuity) setting.
 - 2. One probe on the capacitor minus leg, the other on each pin that read about 0 V. Beeps = GND: press GND in tab 1.
 - 3. Pins that read 5 V or 3.3 V steady and do not beep are probably power. Mark them + power. Never connect the ESP32 to GND or power pins.
+
+## What the readings looked like on Logan's sign (16-pin output header, sign on)
+- About 0 V: pins 6, 7, 8, 11, 12, 15. Probably GND; confirm with the beep test in Step 2.
+- In between (busy signal lines): pins 1, 2, 3, 4, 9, 10, 13, 16 (about 1.8 to 2.6 V), and pin 14 (0.2 V: mostly low with short pulses, typical of a latch).
+- Pin 5 at 3.1 V: mostly high with short low moments, typical of a blanking (OE) line or a slow signal.
+- Nothing above 3.3 V, and the input chip U2 runs at about 2.4 V: no level shifter needed. Supply across the big capacitors is 5 V.
 
 ## Step 3. Record the busy pins
 - 1. Check the highest voltage on the busy pins. If every pin is at or under about 3.6 V, wire each analyzer channel with a single 10 kΩ resistor, like on the V-002.

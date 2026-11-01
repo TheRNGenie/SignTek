@@ -94,10 +94,10 @@ namespace CasinoSignTool
     public class HeaderMap
     {
         public int PinCount { get; set; } = 50;
-        public string Kind { get; set; } = "v002";   // "v002" = 50-pin CPU connector, "panel20" = 20-pin panel input/output
+        public string Kind { get; set; } = "v002";   // "v002" = 50-pin CPU connector, "panel20" = 16-pin panel input/output (name kept for saved files)
         [System.Web.Script.Serialization.ScriptIgnore]
         public bool IsPanel => Kind == "panel20";
-        public static HeaderMap NewPanel() { var m = new HeaderMap { PinCount = 20, Kind = "panel20" }; m.Pins.Clear(); m.EnsurePins(); return m; }
+        public static HeaderMap NewPanel() { var m = new HeaderMap { PinCount = 16, Kind = "panel20" }; m.Pins.Clear(); m.EnsurePins(); return m; }
         public bool FlipView { get; set; }           // mirror left/right (socket seen from the other side)
         public string ProbeGpio { get; set; } = "25";
         public string SniffGpio { get; set; } = "35";
@@ -147,6 +147,7 @@ namespace CasinoSignTool
             var m = Json.Read<HeaderMap>(File.ReadAllText(path)) ?? new HeaderMap();
             m.Pins = m.Pins.OrderBy(p => p.Number).ToList();
             foreach (var p in m.Pins) p.Role = Roles.Code(Roles.FromCode(p.Role));   // old "5V" becomes "3V3"
+            if (m.Kind == "panel20" && m.PinCount != 16) m.PinCount = 16;              // app 1.3.0/1.3.1 drew the panel header with 20 pins; it has 16
             m.EnsurePins();
             return m;
         }

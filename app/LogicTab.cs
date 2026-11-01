@@ -159,6 +159,8 @@ namespace CasinoSignTool
         PinPicker _picker;
         Label _progress;
 
+        /// <summary>A multimeter reading between "low" and "high" means the pin switches fast (the meter shows the average).</summary>
+        static bool VoltsBusy(HeaderPin p) => double.TryParse((p.Volts ?? "").Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v) && v >= 0.15 && v <= 3.2;
         static bool Skip(HeaderPin p) => p.R == PinRole.GND || p.R == PinRole.V5;
         /// <summary>Signal roles found by this analyzer. Roles guessed by single-pin sniffing aren't trusted here.</summary>
         public static bool Confirmed(HeaderPin p) => Roles.Signals.Contains(p.R) && (p.Note ?? "").StartsWith("Logic analyzer");
@@ -208,7 +210,7 @@ namespace CasinoSignTool
             if (clk != null) keep.Add(clk.Number);
             if (lat != null) keep.Add(lat.Number);
             var todo = map.Pins.Where(p => !Skip(p) && p.R != PinRole.NC && !p.LaChecked && !keep.Contains(p.Number))
-                              .OrderByDescending(p => p.SniffHz > 0).ThenBy(p => p.Number).Select(p => p.Number).ToList();
+                              .OrderByDescending(p => p.SniffHz > 0 || VoltsBusy(p)).ThenBy(p => p.Number).Select(p => p.Number).ToList();
             var pick = keep.Concat(todo).Take(8).ToList();
             for (int i = 0; i < 8; i++) _hdr[i].Value = i < pick.Count ? pick[i] : 0;
             _state.ForeColor = SystemColors.ControlText;
@@ -226,7 +228,7 @@ namespace CasinoSignTool
                 System.IO.Directory.CreateDirectory(CapDir);
                 var hdr = string.Join(",", _hdr.Select(h => ((int)h.Value).ToString()));
                 var gp = string.Join(",", Gpios);
-                var json = $"{{\"time\":\"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\",\"rate\":{_sampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"speed\":\"{_rate.SelectedItem}\",\"gpios\":[{gp}],\"header_pins\":[{hdr}],\"data\":\"{b64}\"}}";
+                var json = $"{{\"map\":\"{(_ctx.Map.IsPanel ? "panel16" : "v002")}\",\"time\":\"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\",\"rate\":{_sampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"speed\":\"{_rate.SelectedItem}\",\"gpios\":[{gp}],\"header_pins\":[{hdr}],\"data\":\"{b64}\"}}";
                 System.IO.File.WriteAllText(System.IO.Path.Combine(CapDir, $"capture-{DateTime.Now:yyyyMMdd-HHmmss}.json"), json);
             }
             catch { }
