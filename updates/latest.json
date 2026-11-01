@@ -1,6 +1,6 @@
 {
-  "version": "1.2.1",
+  "version": "1.2.2",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8690761,
-  "notes": "- Logic analyzer tab: Show wiring picture (both boards) button with every wire drawn.\n- Sniff picture and default now use GPIO 35 (the IO-plug pin that works on your board).\n- Includes sign firmware 3.1.0."
+  "size": 8691177,
+  "notes": "- Update window is resizable, with bigger buttons that scale with Windows display settings.\n- Logic analyzer wiring picture (from 1.2.1) and sign firmware 3.1.0 included."
 }

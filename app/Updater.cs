@@ -72,25 +72,31 @@ namespace CasinoSignTool
         /// <summary>The "Check for updates" window.</summary>
         public static async Task ShowDialog(IWin32Window owner, Release known = null)
         {
-            using (var f = new Form { Text = "Update Casino Sign Tool", ClientSize = new Size(560, 400), StartPosition = FormStartPosition.CenterParent, Font = new Font("Segoe UI", 9f), MinimizeBox = false, MaximizeBox = false, FormBorderStyle = FormBorderStyle.FixedDialog })
+            using (var f = new Form { Text = "Update Casino Sign Tool", ClientSize = new Size(640, 460), MinimumSize = new Size(480, 360), StartPosition = FormStartPosition.CenterParent, Font = new Font("Segoe UI", 9.5f), MinimizeBox = false, MaximizeBox = true, FormBorderStyle = FormBorderStyle.Sizable, AutoScaleMode = AutoScaleMode.Dpi })
             {
-                var head = new Label { Dock = DockStyle.Top, Height = 54, Padding = new Padding(10, 10, 10, 0), Font = new Font("Segoe UI", 10.5f, FontStyle.Bold), Text = $"You have version {CurrentText}. Checking for a newer one…" };
+                var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(10) };
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                var head = new Label { AutoSize = true, Dock = DockStyle.Fill, MaximumSize = new Size(2000, 0), Margin = new Padding(0, 0, 0, 8), Font = new Font("Segoe UI", 11f, FontStyle.Bold), Text = $"You have version {CurrentText}. Checking for a newer one…" };
                 var notes = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = SystemColors.Window,
                     Text = "How updating works:\r\n\r\n" +
                            "• The app checks for a new version each time it opens. When there is one, a yellow \"Update available\" button appears in the top bar.\r\n" +
                            "• Press Install update. The app downloads the new version, closes, replaces its files (including the firmware files in the firmware folder), and opens again by itself. It takes under a minute.\r\n" +
                            "• Your settings, pin map, pixel art and playlists are kept: they're stored separately in your user folder.\r\n" +
                            "• If the update includes new sign firmware, the app opens on tab 0 afterwards: press Install firmware (USB) or Update over WiFi to put it on the board.\r\n" +
-                           "• Needs an internet connection. If it fails, nothing is changed and the old version keeps working." };
-                var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 70, FlowDirection = FlowDirection.TopDown, Padding = new Padding(8) };
-                var bar = new ProgressBar { Width = 530, Height = 18, Maximum = 1000 };
-                var row = new FlowLayoutPanel { AutoSize = true };
-                var install = new Button { Text = "Install update", AutoSize = true, Enabled = false, Font = new Font("Segoe UI", 9.5f, FontStyle.Bold) };
-                var close = new Button { Text = "Close", AutoSize = true, DialogResult = DialogResult.Cancel };
-                row.Controls.Add(install); row.Controls.Add(close);
-                bottom.Controls.Add(bar); bottom.Controls.Add(row);
-                f.Controls.Add(notes); f.Controls.Add(bottom); f.Controls.Add(head);
+                           "• Needs an internet connection. If it fails, nothing is changed and the old version keeps working.\r\n" +
+                           "• This window can be resized: drag its edge or corner." };
+                var bar = new ProgressBar { Dock = DockStyle.Fill, Height = 22, Maximum = 1000, Margin = new Padding(0, 8, 0, 8) };
+                var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
+                var close = new Button { Text = "Close", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, MinimumSize = new Size(100, 36), Padding = new Padding(10, 4, 10, 4), DialogResult = DialogResult.Cancel };
+                var install = new Button { Text = "Install update", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, MinimumSize = new Size(150, 36), Padding = new Padding(10, 4, 10, 4), Enabled = false, Font = new Font("Segoe UI", 10.5f, FontStyle.Bold) };
+                row.Controls.Add(close); row.Controls.Add(install);
+                layout.Controls.Add(head, 0, 0); layout.Controls.Add(notes, 0, 1); layout.Controls.Add(bar, 0, 2); layout.Controls.Add(row, 0, 3);
+                f.Controls.Add(layout);
                 f.CancelButton = close;
+                f.Resize += (s, e) => head.MaximumSize = new Size(Math.Max(200, layout.ClientSize.Width - 24), 0);
 
                 Release rel = known;
                 f.Shown += async (s, e) =>
@@ -101,6 +107,7 @@ namespace CasinoSignTool
                     head.Text = $"Version {Norm(rel.Version).ToString(3)} is available (you have {CurrentText}). Download size {rel.Size / 1024 / 1024.0:0.0} MB.";
                     if (!string.IsNullOrWhiteSpace(rel.Notes)) notes.Text = "What's new:\r\n" + rel.Notes.Replace("\r\n", "\n").Replace("\n", "\r\n") + "\r\n\r\n" + notes.Text;
                     install.Enabled = true;
+                    notes.Select(0, 0); install.Focus();
                 };
                 install.Click += async (s, e) =>
                 {
