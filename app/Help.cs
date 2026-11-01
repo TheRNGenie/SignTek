@@ -35,6 +35,7 @@ After the one-time setup, everything is wireless: this app finds the sign on you
 - Step 4. Tell the board how the sign scans (tab 2) and test it.
 - Step 5. Wire it up permanently to both panel connectors using the wiring guide (tab 3).
 - Step 6. Have fun: Display, Playlist & widgets, Fight Night, Pixel art & animations.
+> Testing with an UNO R4 WiFi (no soldering)? Install its firmware in tab 1d. It connects through the top bar like the ESP32 (USB, or WiFi with Find sign), and this page then shows the Uno steps.
 
 > Follow the pages in order the first time. The ""Where you are"" box on the Start here tab tracks your progress and tells you what to do next.
 
@@ -266,7 +267,7 @@ Needs sign firmware 3.4.0 or newer (tab 0).
                 Summary = "Install the Uno firmware from the app, wire 12 signals through 1 kΩ resistors, send test patterns.",
                 Body =
 @"# Uno R4: drive panel 2 without soldering
-The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel signals, so nothing needs soldering. Tab 1d installs its firmware, plays back the sign's own signals (rebuilt from your recordings) and sends test patterns. The ESP32 isn't used on this tab.
+The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel signals, so nothing needs soldering. Tab 1d installs its firmware (one button, no Arduino IDE), connects through the top bar over USB or WiFi, plays back the sign's own signals (rebuilt from your recordings) and sends test patterns. The ESP32 isn't used on this tab.
 
 ## Install the Uno firmware (once)
 - Plug the Uno into the PC with a USB-C data cable.
@@ -282,8 +283,13 @@ The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel sign
 - Take out the old test resistors. Pins 12 and 14 stay empty.
 > The tab has a wiring picture and a photo of the Uno with every socket circled.
 
+## Connecting and WiFi
+- After installing, the app connects to the Uno by itself. Later, connect the same way as the ESP32: pick its COM port in the top bar and press Connect, or press Connect in tab 1d. The top bar then says Connected to the UNO R4.
+- WiFi (optional): while connected over USB, open WiFi & settings, pick your network, type the password and press Save and connect. The Uno joins and remembers it. From then on Find sign in the top bar finds it on the network and everything in tab 1d works without the USB cable (the Uno still needs power from USB or its barrel jack).
+- The Uno only drives panel 2 for testing. Playlists, widgets, Fight Night and the other tabs need the ESP32.
+
 ## Test
-- Plug the Uno into the PC, press Connect, then plug the sign in.
+- Connect to the Uno, then plug the sign in.
 - Press Play the recording first: panel 2 onward should show part of the sign's message. Then try Start test with All on.
 - Nothing lights? Try one at a time: Clock edge = Falling; OE inverted; Latch inverted; Timing pins Always low, then Always high; Slow down = 20.
 - Photograph anything that lights and note which settings were on." },
@@ -674,10 +680,21 @@ Over USB, over WiFi (this app), and over MQTT (send to <prefix>/cmd, the answer 
             bool mapDone = _ctx.Map.Problems().Count(p => !p.Contains("still unknown")) == 0 && mapped > 0;
             string Mark(bool ok) => ok ? "[✓]" : "[ ]";
             _where.Text =
-                $"{Mark(conn)} Board connected     {(conn ? (_ctx.Board.OverWifi ? "over WiFi" : "over USB") + (_fw.Length > 0 ? ", firmware " + _fw : "") : "no (top bar: pick a COM port or press Find sign)")}\n" +
+                $"{Mark(conn)} Board connected     {(conn ? (_ctx.Board.OverWifi ? "over WiFi" : "over USB") + (_fw.Length > 0 ? ", firmware " + _fw : "") : "no (top bar: pick a COM port or press Find sign; ESP32 or UNO R4)")}\n" +
                 $"{Mark(_wifiOk)} Board on WiFi       {(_wifiOk ? "yes, " + _ip : conn ? "not yet" : "unknown until connected")}\n" +
                 $"{Mark(mapDone)} Pins mapped         {mapped} of {total}{(mapDone ? ", all required signals found" : "")}\n" +
                 $"{Mark(_configured)} Sign set up         {(_configured ? "saved on the board" : conn ? "not yet" : "unknown until connected")}";
+            bool uno = conn && _ctx.Info != null && _ctx.Info.Str("board") == "uno";
+            if (uno)
+            {
+                _where.Text =
+                    $"[✓] Board connected     UNO R4 over {(_ctx.Board.OverWifi ? "WiFi" : "USB")}, firmware {_fw} (drives panel 2 for testing)\n" +
+                    $"{Mark(_wifiOk)} Uno on WiFi         {(_wifiOk ? "yes, " + _ip : "not yet (WiFi & settings tab, optional)")}\n" +
+                    $"[ ] Panel 2 lights      try Play the recording in tab 1d, then the test patterns\n" +
+                    $"    The full sign (playlists, widgets, Fight Night) runs on the ESP32, not the Uno.";
+                _nextId = "uno"; _next.Text = "Next: light panel 2 from the Uno  →";
+                return;
+            }
             string id, label;
             if (!conn) { id = "flash"; label = "Next: install firmware and connect"; }
             else if (!_wifiOk) { id = "wifi"; label = "Next: put the board on WiFi"; }

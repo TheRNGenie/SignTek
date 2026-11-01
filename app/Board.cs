@@ -43,10 +43,13 @@ namespace CasinoSignTool
 
         public SerialLink(string portName)
         {
+            // Keep DTR/RTS low so opening the port doesn't reset the ESP32. The UNO R4 WiFi is the opposite:
+            // its USB chip only answers while DTR is on (and DTR doesn't reset it).
+            bool arduino = false;
+            try { arduino = PortInfo.Scan(out _).Any(p => p.Port == portName && p.Vid == "2341"); } catch { }
             _port = new SerialPort(portName, 115200)
             {
-                // Keep DTR/RTS low so opening the port doesn't reset the ESP32.
-                DtrEnable = false, RtsEnable = false,
+                DtrEnable = arduino, RtsEnable = arduino,
                 NewLine = "\n", Encoding = Encoding.UTF8,
                 ReadTimeout = 500, WriteTimeout = 2000,
             };

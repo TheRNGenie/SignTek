@@ -120,7 +120,7 @@ namespace CasinoSignTool
                 _ports.SelectedItem = port;
                 await Task.Delay(1500);   // board is still booting after the flash
                 await ConnectSerial();
-                if (_ctx.Board.Connected) _tabs.SelectedIndex = 1;
+                if (_ctx.Board.Connected && _ctx.Info?.Str("board") != "uno") _tabs.SelectedIndex = 1;
             };
 
             AutoScaleDimensions = new SizeF(96f, 96f);
@@ -316,7 +316,10 @@ namespace CasinoSignTool
             await _ctx.Try("TIME SET " + DateTimeOffset.UtcNow.ToUnixTimeSeconds());
             var cfg = await _ctx.Try("GET CFG");
             if (cfg != null) { _ctx.Cfg.From(cfg); _ctx.RaiseCfg(); }
-            _status.Text = $"Connected to {_ctx.Board.Where}: firmware {info.Str("fw")}, {info.Str("chip")}, mode {info.Str("mode").ToUpperInvariant()}.";
+            _status.Text = info.Str("board") == "uno"
+                ? $"Connected to the UNO R4 on {_ctx.Board.Where}: firmware {info.Str("fw")}{(info.Str("ip").Length > 0 ? ", WiFi " + info.Str("ip") : "")}. Tab 1d controls it."
+                : $"Connected to {_ctx.Board.Where}: firmware {info.Str("fw")}, {info.Str("chip")}, mode {info.Str("mode").ToUpperInvariant()}.";
+            if (info.Str("board") == "uno") GoToTab("1d. Uno R4");
             _ctx.RaiseState();
         }
 

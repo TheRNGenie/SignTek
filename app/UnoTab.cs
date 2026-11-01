@@ -22,7 +22,7 @@ namespace CasinoSignTool
         Button _flash, _connect;
         Label _state, _status;
         TextBox _out;
-        SerialPort _sp;
+        readonly Ctx _ctx;
         bool _busy;
 
         static string AppDir => AppDomain.CurrentDomain.BaseDirectory;
@@ -49,6 +49,8 @@ namespace CasinoSignTool
 
         public UnoTab(Ctx ctx)
         {
+            _ctx = ctx;
+            _ctx.StateChanged += UpdateState;
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52));
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48));
@@ -98,6 +100,13 @@ namespace CasinoSignTool
                 "5. Press Play the recording first: panel 2 (and the panels after it) should show part of the sign's message. Then try Start test with All on.\n" +
                 "6. Nothing lights? Try these one at a time, a few seconds each: Clock edge = falling; OE inverted; Latch inverted; Timing pins = always low, then always high; Slow down = 20.\n" +
                 "Take a phone photo of anything that lights and send it over, together with which settings were on."));
+
+            left.Controls.Add(H("WiFi (optional)"));
+            left.Controls.Add(P(
+                "The Uno connects through the top bar just like the ESP32: over USB (pick its COM port) or over WiFi (Find sign). " +
+                "To put it on WiFi: connect over USB, open the WiFi & settings tab, pick your network, type the password and press Save and connect. " +
+                "It remembers the network. After that, Find sign in the top bar finds it and this tab works without the USB cable (the Uno still needs power from USB or its barrel jack).\n" +
+                "The Uno only drives panel 2 for testing. Playlists, widgets and Fight Night run on the ESP32."));
 
             // ---------------- right: install, connect, controls ----------------
             var right = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
@@ -257,7 +266,8 @@ namespace CasinoSignTool
             if (port == null) { MessageBox.Show(this, "Plug the Uno in and press Refresh first.", "No port"); return; }
             if (!File.Exists(BossacPath) || !File.Exists(UnoFw))
             { MessageBox.Show(this, "The Uno installer files are missing next to the app (bossac\\bossac.exe and firmware\\uno_panel.bin). Re-download the app with the Update button.", "Missing files"); return; }
-            Disconnect();
+            if (_ctx.Board.Connected) { _ctx.Board.Disconnect("installing Uno firmware"); _ctx.RaiseState(); }
+            bool installed = false;
             _busy = true; _flash.Enabled = false;
             _state.ForeColor = SystemColors.ControlText; _state.Text = "Installing… don't unplug the Uno.";
             try
@@ -308,8 +318,9 @@ namespace CasinoSignTool
                 if (code == 0)
                 {
                     _state.ForeColor = Color.DarkGreen;
-                    _state.Text = "Done. The Uno firmware is installed. Press Connect.";
-                    Log("Done.");
+                    _state.Text = "Done. The Uno firmware is installed. Connecting…";
+                    Log("Done. Connecting in 4 seconds…");
+                    installed = true;
                 }
                 else
                 {
@@ -318,6 +329,7 @@ namespace CasinoSignTool
                 }
             }
             finally { _busy = false; _flash.Enabled = true; RefreshPorts(); }
+            if (installed) { await Task.Delay(4000); RefreshPorts(); await ToggleConnect(); }
         }
 
         // bossac keeps whatever line settings the port had last. The Uno's USB chip only answers the PC while
@@ -352,76 +364,65 @@ namespace CasinoSignTool
             return tcs.Task;
         }
 
-        // ---------------- talk to the Uno ----------------
-        async Task ToggleConnect()
+        // ---------------- talk to the Uno (through the app's shared connection in the top bar) ----------------
+        bool UnoConnected => _ctx.Board.Connected && _ctx.Info != null && _ctx.Info.Str("board") == "uno";
+
+        void UpdateState()
         {
-            if (_sp != null) { Disconnect(); return; }
-            var port = SelectedPort;
-            if (port == null) { MessageBox.Show(this, "Plug the Uno in and press Refresh first.", "No port"); return; }
-            try
+            if (InvokeRequired) { BeginInvoke((Action)UpdateState); return; }
+            if (UnoConnected)
             {
-                _sp = new SerialPort(port, 115200) { NewLine = "\n", ReadTimeout = 2500, WriteTimeout = 2000, DtrEnable = true };
-                _sp.Open();
-                await Task.Delay(1500);   // the Uno may restart when the port opens
-                _sp.DiscardInBuffer();
-                var r = await Ask("HELLO");
-                if (r == null || !r.StartsWith("OK uno_panel"))
-                {
-                    _state.ForeColor = Color.DarkRed;
-                    _state.Text = "Connected to " + port + " but the Uno firmware didn't answer. Press Install Uno firmware first.";
-                    Disconnect(keepText: true);
-                    return;
-                }
                 _connect.Text = "Disconnect";
                 _state.ForeColor = Color.DarkGreen;
-                _state.Text = "Connected: " + r.Substring(3);
-                await Cmd("STATUS");
+                _state.Text = $"Connected to the Uno {(_ctx.Board.OverWifi ? "over WiFi" : "over USB")} ({_ctx.Board.Where}), firmware {_ctx.Info.Str("fw")}" +
+                              (_ctx.Info.Str("ip").Length > 0 ? $", WiFi IP {_ctx.Info.Str("ip")}" : ", not on WiFi yet") + ".";
             }
-            catch (Exception ex)
+            else
+            {
+                _connect.Text = "Connect";
+                if (_ctx.Board.Connected) { _state.ForeColor = Color.DarkOrange; _state.Text = "The top bar is connected to the ESP32, not the Uno. Press Disconnect (top bar), then Connect here."; }
+                else if (!_busy) { _state.ForeColor = SystemColors.ControlText; _state.Text = "Not connected."; }
+            }
+        }
+
+        async Task ToggleConnect()
+        {
+            if (_ctx.Board.Connected) { _ctx.Board.Disconnect("disconnected"); _ctx.RaiseState(); return; }
+            var port = SelectedPort;
+            if (port == null) { MessageBox.Show(this, "Plug the Uno in and press Refresh first.", "No port"); return; }
+            if (_ctx.ConnectPort != null) await _ctx.ConnectPort(port);
+            UpdateState();
+            if (!_ctx.Board.Connected)
             {
                 _state.ForeColor = Color.DarkRed;
-                _state.Text = "Couldn't open " + port + ": " + ex.Message + " (close the Arduino IDE or anything else using it).";
-                Disconnect(keepText: true);
+                _state.Text = "The Uno didn't answer on " + port + ". If its firmware was installed with app 1.8.x, press Install Uno firmware once more (this app needs Uno firmware 2.0).";
+                return;
             }
-        }
-
-        void Disconnect(bool keepText = false)
-        {
-            try { _sp?.Close(); } catch { }
-            _sp = null;
-            _connect.Text = "Connect";
-            if (!keepText) { _state.ForeColor = SystemColors.ControlText; _state.Text = "Not connected."; }
-        }
-
-        readonly System.Threading.SemaphoreSlim _lock = new System.Threading.SemaphoreSlim(1, 1);
-
-        async Task<string> Ask(string cmd)
-        {
-            if (_sp == null) return null;
-            await _lock.WaitAsync();
-            try
+            if (!UnoConnected && _ctx.Board.Connected)
             {
-                return await Task.Run(() =>
-                {
-                    try { _sp.WriteLine(cmd); return _sp.ReadLine().Trim(); }
-                    catch (Exception ex) { return "ERR " + ex.Message; }
-                });
+                _state.ForeColor = Color.DarkRed;
+                _state.Text = "Something answered on " + port + " but it isn't the Uno firmware. Press Install Uno firmware first.";
             }
-            finally { _lock.Release(); }
+            if (UnoConnected) await Cmd("STATUS");
+        }
+
+        async Task<Reply> Ask(string cmd, int timeout = 3000)
+        {
+            if (!_ctx.Board.Connected) return null;
+            try { return await _ctx.Board.Send(cmd, timeout, false); }
+            catch (Exception ex) { Log("⚠ " + ex.Message); return null; }
         }
 
         async Task Cmd(string cmd)
         {
-            if (_sp == null) { _status.ForeColor = Color.DarkRed; _status.Text = "Press Connect first."; return; }
+            if (!UnoConnected) { _status.ForeColor = Color.DarkRed; _status.Text = "Connect to the Uno first (Connect button above, or the top bar)."; return; }
             var r = await Ask(cmd);
-            Log("> " + cmd); Log("< " + r);
             if (r == null) return;
-            if (r.StartsWith("ERR")) { _status.ForeColor = Color.DarkRed; _status.Text = "⚠ " + r.Substring(3).Trim(); return; }
-            string Get(string k) { var t = r.Split(' ').FirstOrDefault(x => x.StartsWith(k + "=")); return t?.Substring(k.Length + 1) ?? ""; }
-            var mode = Get("mode");
-            _status.ForeColor = mode == "stop" ? SystemColors.ControlText : Color.DarkGreen;
-            _status.Text = mode == "test" ? $"Running test pattern: {Get("frames")} frames sent so far."
-                         : mode == "replay" ? $"Playing the recording: {Get("frames")} frames sent so far."
+            if (!r.Ok) { _status.ForeColor = Color.DarkRed; _status.Text = "⚠ " + r.Err; return; }
+            var mode = r.Str("run");
+            _status.ForeColor = mode == "stop" || mode == "" ? SystemColors.ControlText : Color.DarkGreen;
+            _status.Text = mode == "test" ? $"Running test pattern: {r.Int("frames")} frames sent so far."
+                         : mode == "replay" ? $"Playing the recording: {r.Int("frames")} frames sent so far."
                          : "Stopped (all outputs off).";
         }
 
@@ -429,28 +430,26 @@ namespace CasinoSignTool
 
         async Task PlayRecording()
         {
-            if (_sp == null) { _status.ForeColor = Color.DarkRed; _status.Text = "Press Connect first."; return; }
+            if (!UnoConnected) { _status.ForeColor = Color.DarkRed; _status.Text = "Connect to the Uno first."; return; }
             if (!File.Exists(ReplayPath)) { _status.ForeColor = Color.DarkRed; _status.Text = "firmware\\uno-replay.txt is missing: press Updates."; return; }
             var words = File.ReadAllText(ReplayPath).Split(new[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             _status.ForeColor = SystemColors.ControlText; _status.Text = $"Sending the recording ({words.Length} clock steps)…";
             var r = await Ask("LOAD " + words.Length);
-            Log("> LOAD " + words.Length); Log("< " + r);
-            if (r == null || !r.StartsWith("OK")) { _status.ForeColor = Color.DarkRed; _status.Text = "⚠ " + r; return; }
+            if (r == null || !r.Ok) { _status.ForeColor = Color.DarkRed; _status.Text = "⚠ " + (r?.Err ?? "no answer"); return; }
             for (int i = 0; i < words.Length; i += 32)
             {
                 var line = "W " + i + " " + string.Join(" ", words.Skip(i).Take(32));
                 r = await Ask(line);
-                if (r == null || !r.StartsWith("OK")) { Log("< " + r); _status.ForeColor = Color.DarkRed; _status.Text = "⚠ sending failed: " + r; return; }
+                if (r == null || !r.Ok) { _status.ForeColor = Color.DarkRed; _status.Text = "⚠ sending failed: " + (r?.Err ?? "no answer"); return; }
             }
             await Cmd($"PLAY slow={(int)_slow.Value} edge={_edge.SelectedIndex}");
         }
 
         async Task Set(string key, int val)
         {
-            if (_sp == null) return;
+            if (!UnoConnected) return;
             await Cmd($"PTEST SET {key}={val}");
         }
 
-        protected override void Dispose(bool disposing) { if (disposing) Disconnect(true); base.Dispose(disposing); }
     }
 }

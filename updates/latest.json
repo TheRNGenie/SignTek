@@ -1,6 +1,6 @@
 {
-  "version": "1.8.5",
+  "version": "1.9.0",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 14307804,
-  "notes": "- Uno install: switches the port's DTR line on before each try (the Uno's USB chip stays silent without it). Keeps trying for 20 s while you double-press RESET."
+  "size": 14326206,
+  "notes": "- The UNO R4 is now a full board in the app: connect it from the top bar over USB or WiFi (Find sign), set its WiFi in WiFi & settings, and the Start here page shows the Uno steps.\n- New Uno firmware 2.0: press Install Uno firmware in tab 1d once more."
 }
