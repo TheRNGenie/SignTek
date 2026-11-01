@@ -1,6 +1,6 @@
 {
-  "version": "1.5.0",
+  "version": "1.6.0",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8732125,
-  "notes": "- New sign firmware 3.3.0: install it in tab 0.\n- Logic analyzer: new Sync to sign clock speeds. Put the sign's clock (panel pin 16) on channel 5 and the board takes one sample per clock tick (rising or falling edge), and measures the clock speed.\n- Panel help explains it."
+  "size": 8788442,
+  "notes": "- Wiring guide (tab 3) redone for the real plan: the ESP32 drives the first panel of BOTH rows through the 16-pin connectors, every signal split equally with one 220 ohm resistor per row. New breadboard picture.\n- All 50-pin / V-002 options and instructions removed. The pin mapper only maps the 16-pin panel connector.\n- New pictures for the logic analyzer and sniff lead (panel connector, 1 kOhm, ground on pin 15).\n- Help updated with everything found so far: rows A/B/C on pins 3/4/1, OE 5, latch 6, clock 16, pixel data on pin 7."
 }

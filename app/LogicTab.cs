@@ -54,12 +54,12 @@ namespace CasinoSignTool
 
             left.Controls.Add(H("Use the ESP32 as an 8-channel logic analyzer"));
             left.Controls.Add(P(
-                "It records 8 controller pins at the same moment and works out which one is CLK, LAT, OE, DATA and the row lines A, B, C.\n\n" +
-                "1. Wire each channel: controller pin → 10 kΩ resistor → the ESP32 pin listed below. Plus one wire from ESP32 GND (the I2C plug pin printed GND) to a controller GND pin. Go by the labels printed next to each plug. (3.3 V controllers like the V-002 only; a 5 V controller needs the 10k/20k divider on every channel.)\n" +
+                "It records 8 panel-connector pins at the same moment and works out which one is CLK, LAT, OE, DATA and the row lines A, B, C.\n\n" +
+                "1. Wire each channel: panel pin → 1 kΩ resistor → the ESP32 pin listed below. Plus one wire from ESP32 GND (the I2C plug pin printed GND) to panel pin 15 (the only ground pin). Go by the labels printed next to each plug. No level shifter: the panel signals stay under 3.3 V.\n" +
                 "2. Choose the pins: press Pick the next 8 pins to check (below), click pins on the socket picture, or type the header pin numbers (0 = not used).\n" +
-                "3. Power the sign normally (V-002 running). Connect the ESP32 by USB, press Capture. It takes about 6 seconds.\n" +
+                "3. Power the sign normally, so it shows its usual message. Connect the ESP32 by USB, press Capture. It takes about 6 seconds.\n" +
                 "4. Read the results, then press Put results in the pin map.\n\n" +
-                "Tip: first clip 8 of the busy pins from your sniff map. Once CLK and LAT are found, keep those two on channels 1 and 2 and move the other 6 clips to new pins each time, so every capture can be compared against the clock."));
+                "Tip: the clock (panel pin 16) must stay on channel 5 for the Sync speeds. Not sure which clip goes where? Pull one clip at a time, capture, and see which channel goes flat."));
 
             var grid = new TableLayoutPanel { AutoSize = true, ColumnCount = 4, Margin = new Padding(0, 4, 0, 4) };
             grid.Controls.Add(new Label { Text = "Ch", AutoSize = true, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
@@ -76,7 +76,7 @@ namespace CasinoSignTool
                 grid.Controls.Add(_chResult[i], 3, i + 1);
             }
             left.Controls.Add(grid);
-            var pic = new Button { Text = "Show wiring picture (both boards)", AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
+            var pic = new Button { Text = "Show wiring picture", AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
             pic.Click += (s, e) => ShowPicture();
             left.Controls.Add(pic);
 
@@ -150,7 +150,7 @@ namespace CasinoSignTool
             using var st = typeof(LogicTab).Assembly.GetManifestResourceStream("logic-wiring.png");
             if (st == null) return;
             var bmp = new Bitmap(st);
-            var f = new Form { Text = "Logic analyzer wiring: both boards", ClientSize = new Size(Math.Min(1400, bmp.Width), Math.Min(900, bmp.Height)), StartPosition = FormStartPosition.CenterParent };
+            var f = new Form { Text = "Logic analyzer wiring: panel connector", ClientSize = new Size(Math.Min(1400, bmp.Width), Math.Min(900, bmp.Height)), StartPosition = FormStartPosition.CenterParent };
             f.Controls.Add(new PictureBox { Image = bmp, Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom });
             f.FormClosed += (s, e) => bmp.Dispose();
             f.Show(FindForm());
@@ -393,7 +393,7 @@ namespace CasinoSignTool
         }
     }
 
-    /// <summary>The 50-pin header as 2 rows of 25 (odd pins on top), coloured by role, with channel assignments.</summary>
+    /// <summary>The panel header as 2 rows of 8 (odd pins on top), coloured by role, with channel assignments.</summary>
     public class PinPicker : Control
     {
         public HeaderMap Map;
@@ -504,7 +504,7 @@ namespace CasinoSignTool
                 ci.Guess = ci.Edges == 0 ? (ci.Duty > 50 ? "steady HIGH (power, or an idle line)" : "steady LOW (ground, unused, or idle)") : "barely changes in this capture";
                 ci.Why = "try a slower speed to see slow signals.";
             }
-            if (active.Count == 0) { a.Summary = "Nothing moved. Check the controller is running, the grounds are joined, and each channel's 10 kΩ goes to the right ESP32 pin."; return a; }
+            if (active.Count == 0) { a.Summary = "Nothing moved. Check the sign is running, the grounds are joined, and each channel's 1 kΩ goes to the right ESP32 pin."; return a; }
 
             // CLK: the busiest channel whose changes come in bursts with gaps between them.
             int clk = active.OrderByDescending(c => a.Ch[c].Edges).First();

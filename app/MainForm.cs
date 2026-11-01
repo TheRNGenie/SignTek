@@ -33,11 +33,12 @@ namespace CasinoSignTool
         public void RaiseMap() { MapChanged?.Invoke(); try { System.IO.Directory.CreateDirectory(AppSettings.Dir); Map.Save(AppSettings.MapPath(Map.Kind)); } catch { } }
         public void RaiseCfg() => CfgChanged?.Invoke();
 
-        /// <summary>Load the saved map for "v002" (50-pin) or "panel20" (16-pin panel connector).</summary>
+        /// <summary>Load the saved map of the 16-pin panel connector (the only connector used now).</summary>
         public HeaderMap LoadMap(string kind)
         {
             try
             {
+                kind = "panel20";
                 var path = AppSettings.MapPath(kind);
                 if (System.IO.File.Exists(path))
                 {
@@ -47,7 +48,7 @@ namespace CasinoSignTool
                 }
             }
             catch { }
-            return kind == "panel20" ? HeaderMap.NewPanel() : new HeaderMap();
+            return HeaderMap.NewPanel();
         }
 
         /// <summary>Switch the pin mapper and logic analyzer to the other connector. Each one keeps its own saved map.</summary>
@@ -103,7 +104,7 @@ namespace CasinoSignTool
             _ctx.Settings = _settings;
             _ctx.Status = s => BeginInvoke((Action)(() => _status.Text = s));
 
-            _ctx.Map = _ctx.LoadMap(_settings.ActiveMap);
+            _ctx.Map = _ctx.LoadMap("panel20");
 
             BuildTopBar();
             BuildBody();

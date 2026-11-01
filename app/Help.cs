@@ -23,16 +23,17 @@ namespace CasinoSignTool
             new HelpTopic { Id = "overview", Title = "What this project does", Summary = "",
                 Body =
 @"# What this project does
-The casino sign (Neurizon ED0204-24, 96 x 16 LEDs) was driven by its own controller board, the CPU-002. This project replaces the CPU-002 with the Freenove 4"" ESP32 touch-screen board. The ESP32 talks to the sign's LED panels over the same 50-pin ribbon cable. The V-002 controller measures 3.3 V on its pins, so the ESP32 (also 3.3 V) can drive the panels directly, without a 74HCT245 level shifter.
+The casino sign (Neurizon ED0204-24, 96 x 16 full-colour LEDs) has two rows of RGB-02 LED panels. Each row is fed by its own Advanced Row Processor board through a 16-pin grey ribbon connector, and the panels pass the signal along to each other with short 16-pin ribbons. This project replaces the old processor boards with the Freenove 4"" ESP32 touch-screen board, which plugs into the 16-pin input of the first panel of BOTH rows. Every signal is split equally to the two connectors.
+The panel signals are 3.3 V or less, the same as the ESP32, so no level shifter is needed: each wire just has a small resistor.
 
 After the one-time setup, everything is wireless: this app finds the sign on your WiFi, and you can change text, playlists, animations and settings, run Fight Night, and even install new firmware without ever plugging in a cable again.
 
 ## The big steps (each has its own page in this guide)
 - Step 1. Install the firmware on the ESP32 (tab 0). Takes a minute; no other software needed.
 - Step 2. Put the ESP32 on your WiFi (WiFi & settings tab). Optional now, but it makes everything else wireless.
-- Step 3. Map the 50-pin connector (tab 1): find out which pin does what.
+- Step 3. Map the 16-pin panel connector (tab 1 and tab 1b): find out which pin does what.
 - Step 4. Tell the board how the sign scans (tab 2) and test it.
-- Step 5. Wire it up permanently using the generated wiring guide (tab 3).
+- Step 5. Wire it up permanently to both panel connectors using the wiring guide (tab 3).
 - Step 6. Have fun: Display, Playlist & widgets, Fight Night, Pixel art & animations.
 
 > Follow the pages in order the first time. The ""Where you are"" box on the Start here tab tracks your progress and tells you what to do next.
@@ -44,17 +45,17 @@ After the one-time setup, everything is wireless: this app finds the sign on you
 @"# Parts and tools you need
 ## Required
 - The Freenove 4"" ESP32 display board and a USB data cable for it (some cables only charge; if Windows doesn't see the board, try another cable).
-- Optional, only for a 5 V controller (the V-002 is 3.3 V, so you don't need it): a 74HCT245 chip (it must be HCT, not HC or LS: HCT reads 3.3 V as a valid high while running at 5 V). One chip handles 8 signals; the wiring guide tells you if you need a second one. Don't have one yet? The wiring guide has a ""No level shifter"" option for a test setup without it (it may or may not work reliably).
-- A small breadboard or perfboard, and jumper wires (male-to-female are handiest for the ribbon connector).
-- A 50-pin IDC connector or the sign's original ribbon cable, so you can plug into the panels without cutting anything.
-- A multimeter with a continuity beeper (to find ground and 5 V pins).
+- Two 16-pin (2 x 8) IDC ribbon cables with plugs, one for each panel row. The short grey ribbons that join the panels are exactly this kind; a spare one or a new 16-pin IDC cable works.
+- A small breadboard or perfboard to make the split, and jumper wires (male-to-female are handiest).
+- 220 Ω resistors (red-red-brown), two for every signal: one for each panel connector. The wiring guide (tab 3) shows the count.
+- One 10 kΩ resistor (keeps the LEDs dark while the ESP32 starts).
+- A multimeter with a continuity beeper.
 
 ## For pin mapping
-- Resistors: one 10 kΩ and one 20 kΩ (or two 10 kΩ in series) for the safe ""sniff"" lead, and one 1 kΩ for the ""probe"" lead.
-- Optional but very helpful: a cheap USB logic analyzer (8 channel, about $10). It records all the signals at once while the original CPU-002 runs the sign, which can map the bus in minutes.
+- Eight 1 kΩ resistors (brown-black-red) for the logic analyzer channels, and one more for the sniff or probe lead.
+- No level shifter (74HCT245) is needed: the panel signals measure 3.3 V or less.
 
 ## Nice to have
-- A 100 nF capacitor across the 74HCT245's 5 V and GND pins (pins 20 and 10), as close to the chip as possible.
 - Heat-shrink or tape, and labels for the wires." },
 
             new HelpTopic { Id = "flash", Title = "Step 1. Install the firmware", Tab = "0. Install firmware",
@@ -116,11 +117,11 @@ This firmware leaves Bluetooth out, because Bluetooth and wireless firmware upda
                 Body =
 @"# Before you open the sign: safety
 ! Unplug the sign from the wall before opening it, and every time you connect or move wires. The power supply inside carries mains voltage.
-! Never connect anything to a pin you have marked GND or 3V3 (power) except the matching wire.
-! Never connect a 5 V signal straight to an ESP32 pin. ESP32 pins are 3.3 V only. For a 5 V controller use the 10k/20k divider for sniffing and the 74HCT245 for driving. If the controller's pins measure 3.3 V (Logan's V-002 does), sniff through a single 10k and drive with the No level shifter wiring.
+! Never connect anything to a pin you have marked GND or + power except the matching wire. On the panel connector, pin 15 is the only ground pin.
+! Never connect a 5 V signal straight to an ESP32 pin. ESP32 pins are 3.3 V only. The panel connector's signal pins measure 3.3 V or less (Logan's sign), so a resistor is all they need; the big capacitors on the panels carry 5 V, so keep wires away from them.
 
 ## Grounds
-The ESP32 and the sign must share a ground, or nothing works (and signals can do odd things). While mapping, connect the ESP32's GND to a sign ground pin you found with the multimeter.
+The ESP32 and the sign must share a ground, or nothing works (and signals can do odd things). Join the ESP32's GND to pin 15 of every panel connector you wire to.
 
 ## Powering the ESP32
 While mapping, power the ESP32 from the PC's USB. For the permanent install the wiring guide (tab 3) shows how to power it from the sign's 5 V supply. Don't connect the PC's USB and the sign's 5 V to the ESP32 at the same time unless the guide says it's safe for your setup.
@@ -129,25 +130,25 @@ While mapping, power the ESP32 from the PC's USB. For the permanent install the 
 The firmware has safety features: a brightness limit (tab 2, Safety max), an automatic 15-second limit on the all-LEDs-on test pattern, and a scan watchdog that blanks the LEDs if the display refresh ever stalls, so a row can't be left stuck on at full power." },
 
             new HelpTopic { Id = "logic", Title = "Logic analyzer: find CLK, LAT, OE, DATA and rows automatically", Tab = "1b. Logic analyzer",
-                Summary = "Record 8 controller pins at once with the ESP32 and let the app work out which is which.",
+                Summary = "Record 8 panel pins at once with the ESP32 and let the app work out which is which.",
                 Body =
 @"# Logic analyzer
 The ESP32 can record 8 pins at the same moment, millions of times a second, and the app then works out from the timing which pin is the clock (CLK), the latch (LAT), blanking (OE), pixel data (DATA) and the row lines (A, B, C, D). This is much faster than sniffing one pin at a time, and it can tell a clock from a data line, which sniffing can't.
 Needs sign firmware 3.1.0 or newer (tab 0).
 
 ## Wiring (8 channels)
-Each channel: controller pin > 10 kΩ resistor > ESP32 pin. One extra wire joins ESP32 GND (the GND pin of the I2C plug) to a controller GND pin. This is for 3.3 V controllers like the V-002 (it measures 3.37 V). A 5 V controller needs the 10k/20k divider on every channel instead.
+Each channel: panel connector pin > 1 kΩ resistor > ESP32 pin. One extra wire joins ESP32 GND (the GND pin of the I2C plug) to panel pin 15. No level shifter: the panel signals stay under 3.3 V.
 - Channel 1: GPIO 35, IO plug (the pin your sniff wire is already on).
 - Channel 2: GPIO 39, IO plug, the other pin.
 - Channel 3: GPIO 25, I2C plug, the pin next to GND.
 - Channel 4: GPIO 32, I2C plug, the pin next to 3V3.
 - Channels 5 to 8: the SPI plug pins printed IO21(CS), IO18(SCK), IO19(MISO), IO23(MOSI) (the SD card slot must be empty). Channel 5 needs firmware 3.2.1 or newer.
 ! Go by the labels printed on the board next to each plug, and check the ground wire is on the pin printed GND. Without a ground connection the channels show jumbled signals that change from capture to capture.
-Press Show wiring picture (both boards) in the tab for a drawing of every wire. The IO plug: channel 1 (GPIO 35) is the pin your sniff wire already works on.
+Press Show wiring picture in the tab for a drawing of every wire. The clock (panel pin 16) goes on channel 5 for the Sync speeds.
 
 ## Using it
-- 1. Pick the pins. The tab shows your pin map as the 50-pin socket: black = GND, red = 3V3 (never clip these), grey = dead, white = busy but not identified yet, coloured = identified by the analyzer, ✓ = already recorded. Press Import a map file… to load a map you saved from tab 1 (it becomes the map in tab 1 too). Press Pick the next 8 pins to check to fill the channels automatically, or click pins on the socket picture to put them on channels (click again to take one off). You can also type header pin numbers by hand.
-- 2. Power the sign normally so the controller is running. Connect the ESP32 by USB.
+- 1. Pick the pins. The tab shows your pin map as the 16-pin socket: black = GND, red = 3V3 (never clip these), grey = dead, white = busy but not identified yet, coloured = identified by the analyzer, ✓ = already recorded. Press Import a map file… to load a map you saved from tab 1 (it becomes the map in tab 1 too). Press Pick the next 8 pins to check to fill the channels automatically, or click pins on the socket picture to put them on channels (click again to take one off). You can also type header pin numbers by hand.
+- 2. Power the sign normally so it shows its usual message. Connect the ESP32 by USB.
 - 3. Speed Fastest, press Capture. Over USB it takes about 6 seconds to arrive.
 - 4. The Result column and the text box show the guess for each channel, with the reason. Press Put results in the pin map to save them in tab 1.
 - 5. Press Pick the next 8 pins to check again. Once CLK and LAT are found it keeps them on channels 1 and 2 and puts 6 pins that haven't been recorded yet on the rest. Move the clips to match and capture again. The line under the socket shows how many pins are left.
@@ -166,141 +167,64 @@ Press Show wiring picture (both boards) in the tab for a drawing of every wire. 
 Each coloured line is one channel: up = high (3.3 V), down = low. Scroll the mouse wheel to zoom in on a spot, drag to move. A solid block means the line is changing faster than the screen can show; zoom in to see the individual ticks.
 
 ## If it finds nothing
-- Nothing moves at all: the controller isn't running, the grounds aren't joined, or the resistors don't reach the right ESP32 pins. Test with the sniff steps in tab 1 first.
+- Nothing moves at all: the sign isn't running, the grounds aren't joined, or the resistors don't reach the right ESP32 pins. Test with the sniff steps in tab 1 first.
 - No clock bursts at Fastest: the clock isn't on any channel yet. Clip other busy pins.
 - The note says the clock is as fast as the ESP32 can record: the guesses are still useful, but a few clock ticks can be missed." },
 
-            new HelpTopic { Id = "panel", Title = "Map the 16-pin panel connector (current plan)", Tab = null,
-                Summary = "Find out what each pin of the grey ribbon between two panels carries, so the ESP32 can drive the panels directly.",
+            new HelpTopic { Id = "mapper", Title = "Step 3. Map the 16-pin panel connector", Tab = "1. Pin mapper",
+                Summary = "Find out what each pin of the panels' 16-pin grey ribbon carries, so the ESP32 can drive both rows directly.",
                 Body =
-@"# Map the 16-pin panel connector
+@"# Step 3. Map the 16-pin panel connector
 ## Why this connector
-Inside the sign, the LED Display Processor (V-002) talks to two Advanced Row Processor boards, one on top of the first panel of each row. Each row processor drives its row of RGB panels through a 16-pin connector, and the panels pass the signal on to each other with short grey 16-pin ribbons. The signal enters at the right end of each row and moves left.
-Each panel buffers its input with two 74HC244 chips (U2, U3) and feeds it to Neurizon's own programmable chip (labelled RGB02-01-PLD). The output to the next panel comes from U34, U24 and U29. Because the format is Neurizon's own, it has to be recorded from a running sign; it can't be looked up.
-The plan: the ESP32 replaces the V-002 and both row processors and plugs into where the row processor fed the first panel. Leave the row processors in until the map is finished: while they run, they show us the real signals.
-In tab 1 (Pin mapper), choose Panel 16-pin grey ribbon at the top. It has its own map, separate from the 50-pin one.
+Inside the sign, an Advanced Row Processor board sits on top of the first panel of each row (two rows, so two processors). Each one feeds its row of RGB panels through a 16-pin connector, and the panels pass the signal on to each other with short grey 16-pin ribbons. The signal enters at the right end of each row and moves left.
+Each panel buffers its input with two 74HC244 chips (U2, U3) and feeds it to Neurizon's own programmable chip (labelled RGB02-01-PLD). The output to the next panel comes from U34, U24 and U29. The format is Neurizon's own, so it has to be recorded from a running sign; it can't be looked up.
+The plan: the ESP32 replaces both row processors and feeds the 16-pin input of the first panel in each row, with the same signals going to both rows. Leave the row processors in until the map is finished: while they run, they show us the real signals.
+
+## What we know so far (Logan's sign)
+- Pin 1 = row C, pin 3 = row A, pin 4 = row B. 1/8 scan: a new row every 32.5 µs.
+- Pin 5 = blanking (OE): high about 61% of the time, low once per row.
+- Pin 6 = a short pulse once per row: most likely the latch (LAT).
+- Pin 16 = a steady clock of about 7.6 MHz that never stops.
+- Pin 15 = ground (the only one; confirmed with the beep test).
+- Pin 7 = pixel data: about 192 bits per row (96 columns for two rows at once), repeating every 8 rows. With a red-only message it is probably the red data.
+- Pins 8, 10, 11 = quiet while the sign shows red only: probably the green and blue data. Still to be confirmed.
+- Pins 9, 13 and 2 = one low pulse per row right after the latch, with a length that changes: probably brightness timing for each colour. Pins 9 and 13 always carry the same signal.
+- Pin 12 = almost silent, pin 14 = always high. Leave them unconnected.
+> A swapped wire caused confusing results for a while: two pairs of analyzer wires were crossed at the ESP32. The pull-one-clip test below found it in one round.
 
 ## Step 1. Voltages (sign on)
 ! Mains power is inside the case. Keep hands and probes away from the power supply and its terminals.
 - 1. Sign OFF. Pull off the grey ribbon between the first panel (the one with the row processor on top) and the next panel. Note which side has the red stripe: that is pin 1.
-- 2. Find pin 1 on the RIGHT-hand header (the one next to U34, U24, U29; it is the first panel's output). Look for a small triangle or a 1 printed beside it.
+- 2. Find pin 1 on the RIGHT-hand header (the one next to U34, U24, U29; it is the first panel's output). Look for a small triangle or a 1 printed beside it. Odd pins are on one row, even pins on the other.
 - 3. Sign ON. Multimeter on DC volts (20 V range). Black probe on the minus leg of one of the big black 1000 µF capacitors: the leg on the striped side.
 - 4. In tab 1, click pin 1. Touch the red probe to pin 1, type the reading in the Voltage box and press Enter: the app moves to pin 2. Do all 16.
-> Reading meanings: about 0 V = ground or a line sitting low. About 3.3 V or 5 V = power or a line sitting high. Anything in between = a busy signal line (a multimeter shows the average of a fast on/off signal).
+> Reading meanings: about 0 V = ground or a line sitting low. About 3.3 V = a line sitting high. Anything in between = a busy signal line (a multimeter shows the average of a fast on/off signal).
 
 ## Step 2. Ground pins (sign off)
 - 1. Sign OFF. Multimeter on the beep (continuity) setting.
 - 2. One probe on the capacitor minus leg, the other on each pin that read about 0 V. Beeps = GND: press GND in tab 1.
-- 3. Pins that read 5 V or 3.3 V steady and do not beep are probably power. Mark them + power. Never connect the ESP32 to GND or power pins.
+- 3. Never connect the ESP32 to GND or power pins except with the ground wire.
 
-## What the readings looked like on Logan's sign (16-pin output header, sign on)
-- About 0 V: pins 6, 7, 8, 11, 12, 15. Probably GND; confirm with the beep test in Step 2.
-- In between (busy signal lines): pins 1, 2, 3, 4, 9, 10, 13, 16 (about 1.8 to 2.6 V), and pin 14 (0.2 V: mostly low with short pulses, typical of a latch).
-- Pin 5 at 3.1 V: mostly high with short low moments, typical of a blanking (OE) line or a slow signal.
-- Nothing above 3.3 V, and the input chip U2 runs at about 2.4 V: no level shifter needed. Supply across the big capacitors is 5 V.
-- The first capture rounds were recorded without a working ground connection, so their pin labels are not used.
+## Step 3. Record the busy pins (tab 1b, Logic analyzer)
+- 1. Wire each analyzer channel with a single 1 kΩ resistor (brown-black-red). Don't use 10 kΩ: the panel's high level is only about 2.5 V, and 10 kΩ rounds off the fast edges so fast lines flicker.
+- 2. Join ESP32 GND (the I2C plug pin printed GND) to pin 15.
+- 3. Push female jumper wires onto the right-hand header pins (ribbon still off).
+- 4. Sign on. Logic analyzer tab: put the pin numbers on the channels, choose a speed and press Capture. Press Put results in the pin map.
+- 5. Press Save my captures as one file (to send) and keep it: it holds everything needed to work out the signal format.
 
-## Step 3. Record the busy pins
-- 1. Check the highest voltage on the busy pins. If every pin is at or under about 3.6 V, wire each analyzer channel with a single 1 kΩ resistor (brown-black-red; 470 Ω is fine too). Don't use 10 kΩ here: the panel's high level is only about 2.5 V, right at the ESP32's limit, and 10 kΩ rounds off the fast edges so fast lines flicker.
-- 2. If any pin reads near 5 V, the panels run at 5 V: use the 10 kΩ + 20 kΩ divider on every channel (tab 1, Show 5 V version) so the ESP32 sees at most 3.3 V.
-- 3. Connect to the right-hand header with female-to-male jumper wires pushed onto the header pins (ribbon still off). Join ESP32 GND to a header GND pin.
-- 4. Sign on. Logic analyzer tab: press Pick the next 8 pins to check, then Capture (try Fastest first, then Turbo). Press Put results in the pin map.
-- 5. Press Save my captures as one file (to send) in the Logic analyzer tab and keep it: it holds everything needed to work out the signal format.
+## Not sure which clip goes to which channel? Pull one at a time
+- 1. Capture once with everything connected.
+- 2. Pull one clip off the sign, capture, push it back. Do the next one.
+- 3. The channel that goes flat (or changes) is the one that clip is on. If it isn't the channel you expected, two wires are crossed.
 
-## Good to know
-- Firmware before 3.2.1 recorded channel 5 on GPIO 5, which isn't on any plug of this board (the SPI plug has IO21), so channel 5 always read high. Update the firmware.
-- If the channels disagree from one capture to the next (a pin that was a clean square wave turns into something else), check the ground wire first: on Logan's setup the ground and IO21 wires were swapped, and every capture was jumbled until it was fixed.
-- Use the Fast 10 MHz speed (below) for fast lines: all 8 channels with exact timing.
-- Keep one known pin (pin 9, row line A) on channel 1 in every round. Then every capture can be lined up against the same reference, and a wire on the wrong pin shows up straight away.
-
-## Fast 10 MHz speed
-- Needs sign firmware 3.2.0 or newer (tab 0). Records all 8 channels at once, 10 million times a second, for 3 ms (30,000 samples). Tested on Logan's board: the self-check passes. (A 20 MHz setting was tried, but the ESP32 only delivered each 10 MHz sample twice, so it was removed.) The ESP32's sound/camera hardware (I2S) does the recording, so the timing is exact.
-- It uses GPIO 16 and 17 (the RGB LED pads) for its own clock, so the board's small RGB LED flickers while it records. Nothing needs to be wired to them.
-- The board checks itself on every Fast capture: it records its own test clock and makes sure it looks right. If the check fails, the message under the Capture button says so. Press Save my captures as one file (to send) and send it: the file holds the check results.
-- If Fast says it got no data from I2S, use Turbo for now and send the captures file.
-
-## Sync to sign clock (firmware 3.3.0)
-- On Logan's panels, pin 16 carries a steady clock of about 8 MHz that never stops. The panel's other lines change in step with it. Recording faster and faster can't keep up with that cleanly, so this speed uses the sign's own clock to time the recording instead: one sample on every clock tick, with nothing missed.
-- Wire pin 16 to channel 5 (the SPI plug pin printed IO21) and the pins you want to read to the other channels. Ground on pin 15, 1 kΩ resistors as usual.
-- Capture once with rising edge and once with falling edge. One of them reads each data line in the middle of its bit (clean), the other right as it changes (messy). Send both.
-- The message under the Capture button shows the measured clock speed. If it says the clock stopped early, check the pin 16 wire.
-- The time scale in the picture assumes the clock is steady, which it is on this sign.
+## Speeds
+- Fast 10 MHz (firmware 3.2.0 or newer): all 8 channels, 10 million times a second, for 3 ms. The board checks itself on every capture. It uses GPIO 16 and 17 (the RGB LED pads) for its own clock, so the small RGB LED flickers; nothing needs to be wired to them.
+- Sync to sign clock (firmware 3.3.0): pin 16 (the clock) MUST be on channel 5 (the SPI plug pin printed IO21). The board then takes one sample on every tick of the sign's own clock, so nothing is missed. Capture with rising edge and with falling edge, and send both.
+- If the sign can show a single colour (or does briefly when it starts up), capture during it: the busy data pin is that colour.
 
 ## Driving the panels later
-- Measured on Logan's sign: the panels' supply is 5 V (across the big capacitors), but every signal pin is 3.3 V or less and the input chip U2 runs at about 2.4 V (its pin 20). So no level shifter is needed.
-- Wire each ESP32 output to its panel input pin through a 220 Ω resistor (red-red-brown) as a safety margin, and join ESP32 GND to a panel GND pin.
-- Check your own sign the same way: if U2 pin 20 ever reads 5 V, use a 74HCT245 level shifter instead (tab 3 shows the wiring)." },
-
-            new HelpTopic { Id = "mapper", Title = "Step 3. Map the 50-pin connector", Tab = "1. Pin mapper",
-                Summary = "Click a pin, test it (multimeter, sniff, or probe), and mark what it is.",
-                Body =
-@"# Step 3. Map the 50-pin connector
-The ribbon cable between the CPU-002 and the LED panels has 50 pins. You need to find which ones carry the signals the sign needs. Most pins are ground or unused; usually only 6 to 10 matter.
-
-## What you're looking for
-- GND (ground) and 3V3 (power; the V-002 runs at 3.3 V): found with the multimeter.
-- DATA: the pixel data (sometimes two: top half and bottom half).
-- CLK: the clock that shifts data along the row.
-- LAT (or LE): the latch that copies the shifted data to the LEDs.
-- OE: output enable, blanks the LEDs while rows switch.
-- A, B, C (and maybe D): the row address lines that pick which row is lit.
-
-## Using the pin graphic
-- Click a pin to select it; arrow keys move between pins.
-- Keys: G = GND, V = 3V3 power, N = not connected, or pick a role from the list on the right.
-- If the picture is mirrored compared to your connector, tick the flip option. Pin 1 is usually marked with a triangle or a red stripe on the cable.
-- The map saves by itself on this PC. Press Send map to board to keep a copy on the ESP32 too.
-
-## Method 1: multimeter (power OFF, finds almost everything)
-Set the meter to continuity (beep). With the sign unplugged you can trace every ribbon pin to the chips on the LED boards. No power, no risk.
-- GND and 5V: touch one lead to the sign's metal chassis or a power-supply ground and the other to each pin. Beep = GND. Power pins: with the controller powered, multimeter on DC volts, black lead on ground, red on each pin; a steady 3.3 V (3.37 V on the V-002) means a power pin. Mark it 3V3.
-- No beeps for ground? The metal case often isn't connected to the electronics. Use one of these instead: the power supply's low-voltage terminal marked V−, −, COM or GND (never the mains side marked L / N / AC); pin 1 of an MBI5170 on an LED board; or the striped (minus) leg of a big round capacitor on an LED board. On 50-pin cables many pins are ground, often every other pin. Check the meter first: touching its two leads together should beep.
-- Driver chips: find the MBI5170 (16 legs) nearest the ribbon connector. Pin 1 is next to the dot or notch; pins count down one side and back up the other. Beep each ribbon pin against its legs: pin 2 = DATA, pin 3 = CLK, pin 4 = LAT, pin 13 = OE. Pin 1 should beep to GND and pin 16 to 5V, which proves you're counting right.
-- CLK, LAT and OE go to every driver chip. DATA only goes to the first chip in a chain (each next chip gets it from the previous chip's pin 14). If a chip on the other half of the sign has its pin 2 on a different ribbon pin, mark that one DATA 2.
-- Row lines: beep the ribbon pins against the inputs of the HZ81731G row-select chip. If it uses the usual layout for that kind of chip (check first: pin 8 beeps to GND, pin 16 to 5V), pins 1, 2, 3 are A, B, C. A second row-select chip or a fourth line means D.
-- No beep to any chip? There's probably a buffer chip in between: beep the ribbon pin to the buffer, then follow the buffer's matching output pin onward.
-- Mark each pin in the app as you find it. Pins that beep to nothing at all are usually not connected (N).
-
-## Method 2: sniff (CPU-002 still connected and running, to confirm or fill gaps)
-In plain words: the old controller keeps running the sign. You touch one ribbon pin at a time with a wire that goes to the ESP32, and the ESP32 listens to what that pin is doing. The app guesses what the pin is from the pattern. You only listen; nothing is sent into the sign.
-First check your controller's voltage: multimeter on DC volts (20V range), controller powered, black lead on ground (a metal screw or the power cable's black wire), red lead on each ribbon pin. Note the highest reading.
-- Highest about 3.3 V (Logan's V-002 reads 3.37 V): the board is 3.3 V, the same as the ESP32. The lead is just ONE 10 kΩ resistor between the probe tip and IO39, with NO resistor to ground. (With the 20 kΩ to ground a 3.3 V signal drops to about 2.2 V, too low for the ESP32 to see, and every pin reads 0 Hz.)
-- Highest about 5 V: use the full lead below, 10 kΩ plus 20 kΩ (or two 10 kΩ) to ground, which turns 5 V into about 3.3 V.
-- Anything above 5.5 V: stop, don't connect the ESP32 to that pin.
-You need: one 10 kΩ resistor (plus a 20 kΩ, or two more 10 kΩ, only for a 5 V board), jumper wires, and a small breadboard if you have one.
-- 1. Build the listening lead (sign unplugged). For a 3.3 V board: one 10 kΩ, one end wired to IO39, the other end is the probe tip, done (skip the rest of this step except the ground). For a 5 V board: Put one end of the 10 kΩ and one end of the 20 kΩ into the same breadboard row (the middle point). Wire the middle point to ESP32 GPIO 39 (the pin labelled 39 on the board's IO connector). Wire the free end of the 20 kΩ to ESP32 GND. Put a jumper wire on the free end of the 10 kΩ: that's your probe tip. Tab 1 has Show whole setup (3.3 V, V-002), a drawing of both boards and the breadboard, and Show 5 V version for the divider, and Show where it plugs into the ESP32 for the back of the board. The IO connector has no ground pin: take GND from the GND pin of the I2C connector.
-- 2. Share the ground: wire ESP32 GND to a ribbon pin you found to be GND with the multimeter (or to the power supply's V− / COM terminal). Without this the readings mean nothing.
-- 3. In the app: connect the ESP32 by USB, go to tab 1, set Sniff GPIO to 39.
-- 4. Power the sign the normal way with the CPU-002 still plugged into the panels by its ribbon, so it shows its usual display. Without the ribbon the CPU-002 may get no power and every pin reads 0 Hz. Keep hands away from the power supply.
-- 4b. Test the lead first. 3.3 V board: touch the probe tip to the controller pin that reads about 3.3 V on the multimeter and press Sniff; it should say about 100% high. 5 V board: touch a 5 V pin (the ESP32 board's own Serial plug on its bottom edge, first pin, is 5 V; pins are 5V, GND, TX0, RX0); about 100% high. Then touch a GND pin: about 0% high. If the high test says 0%: check the lead goes to IO39, the ground from step 2 is connected, and (3.3 V board) that there's no resistor from IO39 to ground.
-- 5. Touch the probe tip to a pin. The easiest spot is the solder joints on the back of the board where the 50-pin socket is soldered. Click the same pin number on the picture and press Sniff this pin (or Space). If the suggestion looks right, press Use suggestion.
-- 6. Pick the next pin and repeat. Skip pins already marked GND or 3V3.
-What the readings mean:
-- Very fast and steady: CLK.
-- A short blip regularly: LAT.
-- A slow on/off pattern: an address line. A is the fastest, B half as fast, C half again.
-- A wide on/off signal: OE. Busy and messy: DATA.
-- Never changes: not used, or a power pin.
-
-## After sniffing: picking out the pins the ESP32 needs
-- Every pin reads 0 Hz, even the power pins? Change Sniff GPIO to 35 and try again: the yellow wire may be on the IO plug's other pin (Logan's works on 35).
-- Sniffing sorts the pins into ground (always 0%), power (always 100%, 0 Hz) and active signal lines. Its OE/LAT/CLK suggestions are guesses: the ESP32 listens too slowly to tell a fast clock from a data line for sure.
-- To drive the sign you only need about 8 lines: CLK, LAT, OE, DATA (one per panel section, sometimes more) and the row lines A, B, C (and D on 1/16-scan panels).
-- Surest way to find them: a beep test on the PANEL side. Sign unplugged, multimeter on continuity. One lead on a pin of the panel's ribbon socket, the other on the legs of the nearest MBI5170: leg 2 = DATA, leg 3 = CLK, leg 4 = LAT, leg 13 = OE. Row chip (HZ81731G, 16 legs): legs 1, 2, 3 = A, B, C. Skip pins you already know are ground or power.
-- CLK, LAT and OE are usually shared by every driver chip, so one beep each is enough. DATA may differ per panel: check the first MBI5170 of each panel.
-- Mark each pin in tab 1 as you find it. Still unsure about some? A cheap USB logic analyzer (8 channels, 24 MHz, about $10) settles it. Its USB cable goes into the PC, not the sign: its 8 wire clips go onto 8 pins of the controller's connector plus one onto GND, and the free PulseView program on the PC shows all 8 signals at once as lines, hundreds of times faster than the ESP32 can listen. CLK looks like fast bursts of ticks, DATA changes in step with CLK, LAT is one short blip after each burst, OE is a long on/off signal, A/B/C step slowly (A fastest).
-
-## Method 3: probe (only if needed, CPU-002 UNPLUGGED)
-- Build the probe lead: ESP32 probe GPIO (default 25, the SCL pin on the board's I2C connector) > 1 kΩ resistor > test lead, and join the ESP32 GND to a sign GND pin. No 74HCT245 or voltage step is needed: the V-002 and its panels run at 3.3 V, the same as the ESP32. The 1 kΩ protects both sides if you touch the wrong pin.
-- Unplug the CPU-002 from the ribbon. Touch the test lead to a pin, press High, Low or Pulse, and watch the sign. The output switches off by itself after the timeout.
-- What you'll see: CLK or DATA pulses make random dots or smears; LAT makes the pattern change in steps; OE makes everything flash; an address line moves which row is lit.
-! Never probe a pin marked GND or 3V3 (power).
-
-## A logic analyzer is the fastest way
-If you have one, connect its ground to a sign GND, clip channels onto 8 unknown pins at a time while the CPU-002 runs, and record. In the recording CLK is the fastest regular signal, LAT pulses once after each burst of CLK, OE toggles around LAT, A/B/C count in binary, and DATA changes in step with CLK. Mark what you find in the app.
-
-## Counting the driver chips
-Count all the MBI5170 chips across the sign's LED boards. That tells you the scan type for step 4: 24 chips means 1/8 scan (two rows lit at once, 3 address lines A B C); 12 chips means 1/16 scan (one row at a time, 4 address lines A B C D). If you're not sure, the Sign setup tab lets you try both." },
+- The panels' supply is 5 V (across the big capacitors), but every signal pin is 3.3 V or less and the input chip U2 runs at about 2.4 V (its pin 20). So no level shifter is needed.
+- Tab 3 (Wiring guide) shows the final wiring: each ESP32 output splits into two 220 Ω resistors, one to each row's panel connector." },
 
             new HelpTopic { Id = "setup", Title = "Step 4. Sign setup and first light", Tab = "2. Sign setup",
                 Summary = "Pick an ESP32 GPIO for each signal, set the scan type, Apply, check the test patterns, Save.",
@@ -309,15 +233,15 @@ Count all the MBI5170 chips across the sign's LED boards. That tells you the sca
 This tab tells the firmware which ESP32 pin drives each sign signal and how the sign scans.
 
 ## Do this
-- Make sure the CPU-002 is unplugged from the ribbon (the ESP32 replaces it).
+- Make sure both row processors are unplugged from their panels (the ESP32 replaces them).
 - For each signal (DATA, CLK, LAT, OE, A, B, C, D), pick an ESP32 GPIO. The defaults work on the Freenove board; the tab warns you if a pin clashes with the screen, touch or another signal.
-- Wire those GPIOs through the 74HCT245 to the header pins you found (tab 3 shows exactly which wire goes where).
+- Wire those GPIOs to both panel connectors (tab 3 shows exactly which wire goes where).
 - Scan rows: 8 (1/8 scan, address lines A B C) or 16 (1/16 scan, A B C D).
 - Press Apply (try it now). Then press the test pattern buttons on the right of the same tab: Corners + arrow (a dot top-left, a dot bottom-right and an arrow pointing right), Walk row and Walk column (a single line that should move smoothly), All on (brief, to spot dead LEDs) and Scroll text. The right side of the tab also says what to change if a pattern looks wrong.
 - When it looks right, press Save to board. From now on the board starts the sign by itself on power-up.
 
 ## Fixing the picture
-- Nothing lights: check GND is shared and 5 V reaches the 74HCT245. Try toggling ""OE is active-low"".
+- Nothing lights: check GND (pin 15) is joined on both connectors and the sign's power supply is on. Try toggling ""OE is active-low"".
 - Everything inverted (dark where it should be lit): toggle ""Invert data"".
 - Rows in the wrong order, doubled or upside down: check the address lines are in the right order (A is the fastest), or toggle ""Reverse row order"". Try the other scan type (8 or 16 rows).
 - Picture mirrored left-to-right: toggle ""Reverse columns"".
@@ -327,32 +251,33 @@ This tab tells the firmware which ESP32 pin drives each sign signal and how the 
 ## Brightness and safety
 Brightness sets the normal level. Safety max is a hard limit nothing can go above (playlists, Home Assistant, the console). Lower it if the power supply gets warm." },
 
-            new HelpTopic { Id = "wiring", Title = "Step 5. Permanent wiring", Tab = "3. Wiring guide",
-                Summary = "A wiring list built from your pin map. Print it and follow it for the final install.",
+            new HelpTopic { Id = "wiring", Title = "Step 5. Permanent wiring (both panel rows)", Tab = "3. Wiring guide",
+                Summary = "Wire every ESP32 signal to both rows' 16-pin panel connectors, split equally. Print it and follow it.",
                 Body =
 @"# Step 5. Permanent wiring
-The Wiring guide tab builds the final connection list from your pin map (tab 1) and your GPIO choices (tab 2). It updates as you map pins.
+The sign has two rows of panels, and each row has its own 16-pin input (where its row processor used to plug in). The ESP32 drives both rows at once: every signal wire splits in two, with one 220 Ω resistor going to each row's connector. The pin numbers are the same on both connectors.
 
-## No 74HCT245 yet?
-Tick ""No level shifter"" at the top of the Wiring guide tab. The diagram and steps switch to a direct setup: each ESP32 pin goes through a 220 Ω resistor straight to the header, grounds are joined, and the sign's 5 V stays off the ESP32. The sign's chips officially want about 3.5 V for a ""high"" and the ESP32 gives 3.3 V, so this may work fine, flicker, or not work at all. If it misbehaves, adding the 74HCT245 is the fix.
+## The picture
+The Wiring guide tab draws it: Row 1 (top) connector on the left, the ESP32 in the middle, Row 2 (bottom) connector on the right. Each coloured line is one signal: it leaves the ESP32, splits, and goes through its own 220 Ω resistor to the same pin on both connectors. Press Show breadboard picture for a drawing of the real parts.
+- Green rows are confirmed by the recordings. Amber rows (marked ""check first"") are best guesses: wire them last, after the next recordings confirm them.
 
 ## Where the pins are on the Freenove board
-The default sign pins are on the board's SPI connector (GPIO 23, 19, 18, 21) and I2C connector (GPIO 32, 25), plus GPIO 0 on the BOOT button pad. The wiring guide shows the location next to each GPIO. Leave the SD card slot empty, because it shares the SPI connector's pins. The screen uses GPIO 2, 12, 13, 14, 15, 27 and 33, so those are never offered for the sign.
+The sign pins are on the board's SPI plug (IO23, IO19, IO18, IO21) and I2C plug (IO32, IO25), plus solder points: GPIO 0 on the BOOT button pad, the RGB LED pads (IO22, IO16, IO17) and the speaker pads (IO26, IO4) for the extra data and colour lines. The wiring guide shows the location next to each GPIO. Leave the SD card slot empty, because it shares the SPI plug's pins. The screen uses GPIO 2, 12, 13, 14, 15, 27 and 33, so those are never offered for the sign.
 
 ## How to use it
-- Fix every warning at the top of the guide first (missing pins, GPIOs not set).
 - Press Save as printable page and print it, or Copy as text.
-- Unplug the sign. Remove the CPU-002 board (keep it, so you can always go back).
-- Build the 74HCT245 board: 5 V to pin 20, GND to pin 10, pin 1 (DIR) to 5 V, pin 19 (OE) to GND, the 100 nF capacitor across pins 20 and 10.
-- Wire each line exactly as listed: ESP32 GPIO > 74HCT245 A input (pins 2 to 9) > matching B output (pins 18 to 11) > header pin. Tick each checkbox as you go.
-- Connect every header pin marked GND to ground. Leave unknown and not-connected pins unconnected.
-- Power: follow the guide's power section to feed the ESP32 from the sign's 5 V supply.
+- Unplug the sign. Unplug both Advanced Row Processor boards from their panels (keep them, so you can always go back).
+- Plug a 16-pin ribbon into the input header of the first panel of each row (where the row processor sat). Red stripe = pin 1.
+- On the breadboard, give each signal one row. The ESP32 wire goes into that row, and two 220 Ω resistors go out of it: one to the Row 1 ribbon pin, one to the Row 2 ribbon pin. Tick each checkbox as you go.
+- Ground: ESP32 GND to pin 15 of BOTH ribbons.
+- The 10 kΩ goes from the OE GPIO to 3.3 V, so the LEDs stay dark while the ESP32 starts.
+- Leave every pin the guide lists as unused unconnected.
 
 ## Before turning it on
-- With the power still off, use the multimeter to check there's no short between 5 V and GND.
+- With the power still off, use the multimeter to check no signal wire beeps to GND.
 - Plug the sign in. The board starts, its screen shows SIGN ON, and the sign shows the startup animation and then the playlist.
 
-> Keep the USB cable handy for the first power-up in case you need the console, but after that everything works over WiFi." },
+> The two rows get identical signals. If later recordings show each row needs its own picture data, only the data wires change: the guide will then give Row 2 its own data GPIOs." },
 
             new HelpTopic { Id = "display", Title = "Display: text, patterns, live view", Tab = "Display",
                 Summary = "Send a message right now, run test patterns, and watch what the sign is showing.",
@@ -469,7 +394,7 @@ See Step 1: try another cable, wait for the driver, or hold BOOT while pressing 
 ## The sign stays dark
 - Is the board in RUN mode (top bar)? It starts in Diagnostics until a sign setup is saved.
 - Is the sign switched on (top bar Sign ON / OFF)? Is the overnight schedule turning it off?
-- Check GND is shared and the 74HCT245 has 5 V.
+- Check ESP32 GND reaches pin 15 on both panel connectors.
 - Try toggling ""OE is active-low"" in tab 2.
 - The board may have stopped the display because of a watchdog trip (see below).
 
@@ -694,7 +619,7 @@ Over USB, over WiFi (this app), and over MQTT (send to <prefix>/cmd, the answer 
             string id, label;
             if (!conn) { id = "flash"; label = "Next: install firmware and connect"; }
             else if (!_wifiOk) { id = "wifi"; label = "Next: put the board on WiFi"; }
-            else if (!mapDone) { id = "mapper"; label = "Next: map the 50-pin connector"; }
+            else if (!mapDone) { id = "mapper"; label = "Next: map the 16-pin panel connector"; }
             else if (!_configured) { id = "setup"; label = "Next: sign setup"; }
             else { id = "playlist"; label = "All set: build your playlist"; }
             _nextId = id; _next.Text = label + "  →";

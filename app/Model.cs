@@ -34,7 +34,7 @@ namespace CasinoSignTool
         {
             PinRole.Unknown => "Unknown (not tested yet)",
             PinRole.GND => "GND (ground)",
-            PinRole.V5 => "+ power (3.3 V on the V-002, maybe 5 V on a panel)",
+            PinRole.V5 => "+ power (leave unconnected)",
             PinRole.NC => "Not connected / does nothing",
             PinRole.DataTop => "DATA (serial data, top half or only line)",
             PinRole.DataBot => "DATA 2 (serial data, bottom half)",
@@ -90,11 +90,11 @@ namespace CasinoSignTool
         public PinRole R { get => Roles.FromCode(Role); set => Role = Roles.Code(value); }
     }
 
-    /// <summary>The 50-pin ribbon header map. Saved as JSON on the PC, and a compact copy on the board.</summary>
+    /// <summary>The panel's 16-pin grey-ribbon connector map. Saved as JSON on the PC, and a compact copy on the board.</summary>
     public class HeaderMap
     {
-        public int PinCount { get; set; } = 50;
-        public string Kind { get; set; } = "v002";   // "v002" = 50-pin CPU connector, "panel20" = 16-pin panel input/output (name kept for saved files)
+        public int PinCount { get; set; } = 16;
+        public string Kind { get; set; } = "panel20";   // always the 16-pin panel connector ("panel20" kept for saved files)
         [System.Web.Script.Serialization.ScriptIgnore]
         public bool IsPanel => Kind == "panel20";
         public static HeaderMap NewPanel() { var m = new HeaderMap { PinCount = 16, Kind = "panel20" }; m.Pins.Clear(); m.EnsurePins(); return m; }
@@ -130,7 +130,6 @@ namespace CasinoSignTool
             var m = new HeaderMap();
             if (string.IsNullOrWhiteSpace(s)) return m;
             var parts = s.Split('|');
-            if (int.TryParse(parts[0], out int n) && n >= 2 && n <= 80) { m.PinCount = n; m.Pins.Clear(); m.EnsurePins(); }
             foreach (var part in parts.Skip(1))
             {
                 var kv = part.Split('=');
@@ -147,7 +146,7 @@ namespace CasinoSignTool
             var m = Json.Read<HeaderMap>(File.ReadAllText(path)) ?? new HeaderMap();
             m.Pins = m.Pins.OrderBy(p => p.Number).ToList();
             foreach (var p in m.Pins) p.Role = Roles.Code(Roles.FromCode(p.Role));   // old "5V" becomes "3V3"
-            if (m.Kind == "panel20" && m.PinCount != 16) m.PinCount = 16;              // app 1.3.0/1.3.1 drew the panel header with 20 pins; it has 16
+            m.Kind = "panel20"; m.PinCount = 16;                                          // only the 16-pin panel connector is used now
             m.EnsurePins();
             return m;
         }
@@ -167,6 +166,32 @@ namespace CasinoSignTool
             if (unk > 0) r.Add($"{unk} pin(s) still unknown. They will be left unconnected.");
             return r;
         }
+    }
+
+    /// <summary>What we know about each pin of the panel's 16-pin grey-ribbon connector (from Logan's recordings, 2026-11-01).</summary>
+    public static class PanelPinout
+    {
+        public class Entry { public int Pin; public int Pin2; public PinRole Role; public string Name; public bool Sure; public int ExtraGpio = -1; }
+
+        /// <summary>Signals the ESP32 drives, in wiring order. Sure = confirmed by recordings; otherwise a best guess still to be checked.
+        /// Pin2 = a second pin that always carries the same signal (wired to the same GPIO).</summary>
+        public static readonly Entry[] Signals =
+        {
+            new Entry { Pin = 16, Role = PinRole.Clk, Name = "CLK (clock)", Sure = true },
+            new Entry { Pin = 6,  Role = PinRole.Lat, Name = "LAT (latch)", Sure = false },
+            new Entry { Pin = 5,  Role = PinRole.Oe,  Name = "OE (blanking)", Sure = true },
+            new Entry { Pin = 3,  Role = PinRole.A,   Name = "Row A", Sure = true },
+            new Entry { Pin = 4,  Role = PinRole.B,   Name = "Row B", Sure = true },
+            new Entry { Pin = 1,  Role = PinRole.C,   Name = "Row C", Sure = true },
+            new Entry { Pin = 7,  Role = PinRole.DataTop, Name = "Pixel data (red?)", Sure = false },
+            new Entry { Pin = 8,  Role = PinRole.DataBot, Name = "Pixel data 2 (green/blue?)", Sure = false, ExtraGpio = 22 },
+            new Entry { Pin = 10, Role = PinRole.Other,   Name = "Pixel data 3 (green/blue?)", Sure = false, ExtraGpio = 17 },
+            new Entry { Pin = 11, Role = PinRole.Other,   Name = "Pixel data 4 (?)", Sure = false, ExtraGpio = 26 },
+            new Entry { Pin = 9,  Pin2 = 13, Role = PinRole.Other, Name = "Colour timing 1", Sure = false, ExtraGpio = 16 },
+            new Entry { Pin = 2,  Role = PinRole.Other,   Name = "Colour timing 2", Sure = false, ExtraGpio = 4 },
+        };
+        public const int Gnd = 15;
+        public static readonly int[] LeaveOpen = { 12, 14 };
     }
 
     /// <summary>Where each usable GPIO is on the Freenove 4" ESP32 display board (from Freenove's schematic).</summary>

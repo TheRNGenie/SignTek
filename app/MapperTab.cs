@@ -154,7 +154,6 @@ namespace CasinoSignTool
         ComboBox _role, _probeGpio, _sniffGpio;
         TextBox _note, _volts;
         Label _steps, _voltHint;
-        RadioButton _rbPanel, _rbV002;
         NumericUpDown _timeout;
         Button _useSuggestion;
         PinRole _suggested = PinRole.Unknown;
@@ -188,14 +187,9 @@ namespace CasinoSignTool
             _steps = new Label { AutoSize = true, MaximumSize = new Size(760, 0), Padding = new Padding(4) };
             var top = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Dock = DockStyle.Fill };
             var chooser = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
-            chooser.Controls.Add(new Label { Text = "Which connector are you mapping?", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(4, 6, 8, 0) });
-            _rbPanel = new RadioButton { Text = "Panel 16-pin grey ribbon (current plan)", AutoSize = true };
-            _rbV002 = new RadioButton { Text = "V-002 50-pin (old plan)", AutoSize = true };
-            _rbPanel.CheckedChanged += (s, e) => { if (_rbPanel.Checked && !_loading) _ctx.SwitchMap("panel20"); };
-            _rbV002.CheckedChanged += (s, e) => { if (_rbV002.Checked && !_loading) _ctx.SwitchMap("v002"); };
-            chooser.Controls.Add(_rbPanel); chooser.Controls.Add(_rbV002);
-            var panelHelp = new Button { Text = "? Panel steps", AutoSize = true };
-            panelHelp.Click += (s, e) => Help.Show(FindForm(), "panel");
+            chooser.Controls.Add(new Label { Text = "Panel 16-pin grey ribbon connector", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(4, 6, 8, 0) });
+            var panelHelp = new Button { Text = "? Steps", AutoSize = true };
+            panelHelp.Click += (s, e) => Help.Show(FindForm(), "mapper");
             chooser.Controls.Add(panelHelp);
             top.Controls.Add(chooser);
             top.Controls.Add(_steps);
@@ -286,14 +280,11 @@ namespace CasinoSignTool
             side.Controls.Add(_voltHint);
 
             // ---- Sniff (passive) ----
-            side.Controls.Add(H("Sniff the pin (CPU-002 running)"));
-            side.Controls.Add(P("3.3 V controller (the V-002 measures 3.37 V): header pin → one 10k → ESP32 GPIO 39 (IO connector), nothing to ground. 5 V controller: add a 20k from GPIO 39 to GND. Always join the grounds."));
-            var pic33 = new Button { Text = "Show whole setup (3.3 V, V-002)", AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
-            pic33.Click += (s, e) => ShowPicture("sniff-setup-3v3.png", "Sniff setup for a 3.3 V controller: both boards");
+            side.Controls.Add(H("Sniff the pin (sign running)"));
+            side.Controls.Add(P("Panel pin → one 1 kΩ resistor → ESP32 IO35 (IO connector), nothing to ground. Join the grounds: ESP32 GND (I2C plug) → panel pin 15."));
+            var pic33 = new Button { Text = "Show whole setup", AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
+            pic33.Click += (s, e) => ShowPicture("sniff-setup-3v3.png", "Sniff setup: panel connector to the ESP32");
             side.Controls.Add(pic33);
-            var pic = new Button { Text = "Show 5 V version (divider)", AutoSize = true };
-            pic.Click += (s, e) => ShowPicture("sniff-lead.png", "Sniff lead for a 5 V controller: breadboard wiring");
-            side.Controls.Add(pic);
             var back = new Button { Text = "Show where it plugs into the ESP32", AutoSize = true };
             back.Click += (s, e) => ShowPicture("esp32-back.png", "Back of the ESP32 board: listening-lead wires");
             side.Controls.Add(back);
@@ -313,8 +304,8 @@ namespace CasinoSignTool
             side.Controls.Add(_useSuggestion);
 
             // ---- Probe (active) ----
-            side.Controls.Add(H("Probe the pin (CPU-002 unplugged)"));
-            side.Controls.Add(P("Wire: ESP32 probe GPIO → 1k resistor → test lead. No 74HCT245 needed: the V-002 and its panels run at 3.3 V like the ESP32. Never probe pins marked GND or 3V3. Outputs switch off by themselves after the timeout."));
+            side.Controls.Add(H("Probe the pin (row processor unplugged)"));
+            side.Controls.Add(P("Wire: ESP32 probe GPIO → 1k resistor → test lead. No level shifter needed: the panels run at 3.3 V like the ESP32. Only probe a panel whose row processor is unplugged, and never probe pin 15 (GND). Outputs switch off by themselves after the timeout."));
             var prow = new FlowLayoutPanel { AutoSize = true };
             prow.Controls.Add(new Label { Text = "Probe GPIO:", AutoSize = true, Margin = new Padding(0, 7, 2, 0) });
             _probeGpio = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 60 };
@@ -376,19 +367,11 @@ namespace CasinoSignTool
 
         void UpdateKind()
         {
-            _loading = true;
-            _rbPanel.Checked = _ctx.Map.IsPanel; _rbV002.Checked = !_ctx.Map.IsPanel;
-            _loading = false;
-            _steps.Text = _ctx.Map.IsPanel
-                ? "Panel 16-pin connector (the grey ribbon between two panels). The signal enters at the right end of each row and moves left.\n" +
+            _steps.Text = "Panel 16-pin connector (the grey ribbon between two panels). The signal enters at the right end of each row and moves left.\n" +
                   "  Step 1, sign ON, ribbon between two panels pulled off: measure each pin of the RIGHT-hand header (next to U34, U24, U29; it is the output of the right panel and still driven). Black probe on the minus leg (striped side) of a big 1000µF capacitor. Type each reading in the Voltage box and press Enter to move to the next pin.\n" +
                   "  Step 2, sign OFF: beep each pin to the capacitor minus leg. Beeps = GND.\n" +
-                  "  Step 3: Logic analyzer tab. Record the busy pins (readings between about 0.5 V and 4.5 V) with the sign running. Only connect the ESP32 if no pin reads above 3.6 V, or use a level shifter (? Panel steps).\n" +
-                  "Pin 1 is marked by a small triangle or \"1\" beside the header. Odd pins are on one row, even pins on the other."
-                : "How to map the header (click a pin, then):\n" +
-                  "  Step 1, power OFF, multimeter: beep each pin to the chassis (G) and the power rail (V, 3.3 V on the V-002), then to the driver chip legs: MBI5170 pin 2 = DATA, 3 = CLK, 4 = LAT, 13 = OE (? Help has the full steps).\n" +
-                  "  Step 2, safest, CPU-002 still plugged in and running: clip the sniff lead onto a pin and press Sniff. 3.3 V controller (V-002 measures 3.37 V): lead = one 10k to IO39, nothing to ground. 5 V controller: 10k/20k divider (Show breadboard picture). Test the lead first on a pin at full voltage: it must read about 100% high.\n" +
-                  "  Step 3, only if needed, CPU-002 UNPLUGGED: touch the probe lead (through a 1k resistor) to a pin and blink it. Watch the sign to see what reacts.\n" +
+                  "  Step 3: Logic analyzer tab. Record the busy pins with the sign running, each through a 1 kΩ resistor, ground wire on pin 15. The panel signals stay under 3.3 V, so no level shifter is needed.\n" +
+                  "Pin 1 is marked by a small triangle or \"1\" beside the header. Odd pins are on one row, even pins on the other.\n" +
                   "Arrow keys move between pins. The map saves itself; use \"Send map to board\" to keep a copy on the ESP32.";
         }
 
@@ -506,7 +489,7 @@ namespace CasinoSignTool
                               $"This one is {(bit == 0 ? "the fastest, so A" : $"{Math.Pow(2, bit):0}x slower than the fastest, so {Roles.Code(role)}")}. Sniff all of them for a reliable ranking.");
             }
             if (duty < 6) return (PinRole.Lat, "LAT. Very short high pulses, about once per row.");
-            if (duty > 94) return (PinRole.Oe, "OE (or an active-low latch). Mostly high with short low pulses. Try blinking it with the CPU-002 unplugged to be sure.");
+            if (duty > 94) return (PinRole.Oe, "OE (or an active-low latch). Mostly high with short low pulses. Try blinking it with the row processor unplugged to be sure.");
             if (duty < 35 && hz < 50_000) return (PinRole.Oe, "OE. Short blanking pulses around each row change.");
             if (hz > 20_000) return (PinRole.DataTop, "DATA. It changes fast and irregularly. If you find two of these, one is DATA 2 (bottom half).");
             return (PinRole.Other, "active, but doesn't match a known pattern. Mark it Other, or sniff again.");
