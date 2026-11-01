@@ -70,7 +70,7 @@ namespace CasinoSignTool
             left.Controls.Add(P(
                 "1. Plug the Uno into this PC with a USB-C data cable. Nothing else needs to be connected to it yet.\n" +
                 "2. On the right, press Refresh and pick the Uno's port. It is marked \"likely the Uno\".\n" +
-                "3. Press Install Uno firmware and wait about 20 seconds until it says Done.\n" +
+                "3. Press Install Uno firmware. When it asks, double-press the Uno's RESET button (two quick presses): the L light next to pin 13 slowly fades in and out. Wait until it says Done.\n" +
                 "If it fails: press the Uno's RESET button twice quickly, so the L light (next to pin 13) slowly fades in and out, then press Install within 5 seconds."));
 
             left.Controls.Add(H("Step 2: wiring (sign unplugged, Uno unplugged)"));
@@ -266,8 +266,20 @@ namespace CasinoSignTool
                 if (ctxHoldsPort(port)) Log("  Note: the top bar may be connected to this port; press Disconnect at the top first if the install fails.");
                 string args() => $"-d --port={port} -U -e -w \"{UnoFw}\" -R";
                 // Route 1: the Uno may already be in install mode (RESET pressed twice: the L light fades in and out).
-                Log("Try 1: is the Uno already in install mode?");
-                int code = await RunBossac(args());
+                // Keep trying for about 20 seconds so the RESET double-press can happen at any time.
+                _state.ForeColor = Color.DarkOrange;
+                _state.Text = "Now double-press the Uno's RESET button (two quick presses). The L light next to pin 13 should slowly fade in and out.";
+                int code = -1;
+                var until = DateTime.Now.AddSeconds(20);
+                int n = 0;
+                while (DateTime.Now < until)
+                {
+                    Log($"Try {++n}: waiting for the Uno's install mode (double-press RESET)…");
+                    code = await RunBossac(args());
+                    if (code == 0) break;
+                    await Task.Delay(300);
+                }
+                _state.ForeColor = SystemColors.ControlText; _state.Text = "Installing… don't unplug the Uno.";
                 if (code != 0)
                 {
                     // Route 2: ask it to restart into install mode, the way the Arduino IDE does (1200 baud, DTR drop).

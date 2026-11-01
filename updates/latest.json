@@ -1,6 +1,6 @@
 {
-  "version": "1.8.3",
+  "version": "1.8.4",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 14307053,
-  "notes": "- Tab 1d: Play the recording sends the sign's own panel signals (rebuilt from your recordings) from the Uno to panel 2."
+  "size": 14307515,
+  "notes": "- Uno install keeps trying for 20 seconds while you double-press the Uno's RESET button, so the timing no longer matters."
 }
