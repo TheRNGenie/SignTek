@@ -1,6 +1,6 @@
 {
-  "version": "1.7.3",
+  "version": "1.7.4",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 9011065,
-  "notes": "- Panel test wiring fixed: on the panel header, ground (15) and clock (16) are at the BOTTOM and pins 1-2 at the top, the same as the header you measured.\n- Includes firmware 3.4.0 and tab 1c. Panel test."
+  "size": 9118891,
+  "notes": "- New breadboard picture for the permanent wiring (tab 3, Show breadboard picture): same style as the panel test picture, with the real ESP32 plugs and solder pads, two 220 Ω per signal, and both panel headers upright with ground and clock at the bottom.\n- Pins 9 and 13 now share one resistor per row with a short jumper on the header."
 }

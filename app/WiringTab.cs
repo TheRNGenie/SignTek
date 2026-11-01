@@ -28,7 +28,7 @@ namespace CasinoSignTool
     {
         public List<WireRun> Runs = new List<WireRun>();
         public List<string> Warnings = new List<string>();
-        public int Resistors => Runs.Sum(r => r.Pin2 > 0 ? 4 : 2);
+        public int Resistors => Runs.Sum(r => 2);
 
         public static WiringPlan Build(HeaderMap map, SignCfg cfg)
         {
@@ -67,7 +67,7 @@ namespace CasinoSignTool
 
             foreach (var r in Runs)
                 A(S2, r.Pin2 > 0
-                    ? $"{r.Name}{(r.Sure ? "" : " (check first)")}: ESP32 GPIO {r.Gpio}{Where(r.Gpio)} → one breadboard row → four 220 Ω resistors → Row 1 pins {r.Pin} and {r.Pin2}, Row 2 pins {r.Pin} and {r.Pin2} (these two pins always carry the same signal)."
+                    ? $"{r.Name}{(r.Sure ? "" : " (check first)")}: ESP32 GPIO {r.Gpio}{Where(r.Gpio)} → one breadboard row → 220 Ω → Row 1 pin {r.Pin}, and a second 220 Ω → Row 2 pin {r.Pin}. On each header, add a short jumper wire from pin {r.Pin} to pin {r.Pin2} (these two pins always carry the same signal)."
                     : $"{r.Name}{(r.Sure ? "" : " (check first)")}: ESP32 GPIO {r.Gpio}{Where(r.Gpio)} → one breadboard row → 220 Ω → Row 1 pin {r.Pin}, and a second 220 Ω → Row 2 pin {r.Pin}.");
             var oe = Runs.FirstOrDefault(r => r.Role == PinRole.Oe);
             if (oe != null) A(S2, $"Optional, later: a 10 kΩ on GPIO {oe.Gpio} keeps the LEDs dark while the ESP32 starts. Which way (to GND or to 3.3V) depends on the OE polarity: the panel test (tab 1c) shows it. Leave it out until then.");
