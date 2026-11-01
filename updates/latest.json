@@ -1,6 +1,6 @@
 {
-  "version": "1.1.2",
+  "version": "1.1.4",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8436588,
-  "notes": "- Sign firmware 3.0.3: the screen now starts first, exactly like the screen test, and lists each start-up step on screen and in Watch board output.\n- After updating: tab 0, press Install firmware (USB) to put 3.0.3 on the board."
+  "size": 8438276,
+  "notes": "- The pin map now uses 3V3 for power pins (the V-002 runs at 3.3 V). Saved maps convert automatically.\n- Probe method (method 3): no 74HCT245 or 5 V step, just ESP32 GPIO > 1k resistor > test lead.\n- Wiring guide: direct wiring is now the default (no level shifter needed at 3.3 V).\n- New help: picking out the pins the ESP32 needs after sniffing, and what a USB logic analyzer does.\n- Includes sign firmware 3.0.3."
 }

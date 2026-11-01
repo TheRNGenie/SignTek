@@ -17,7 +17,7 @@ namespace CasinoSignTool
 
         public static string Code(PinRole r) => r switch
         {
-            PinRole.Unknown => "?", PinRole.GND => "GND", PinRole.V5 => "5V", PinRole.NC => "NC",
+            PinRole.Unknown => "?", PinRole.GND => "GND", PinRole.V5 => "3V3", PinRole.NC => "NC",
             PinRole.DataTop => "DAT", PinRole.DataBot => "DAT2", PinRole.Clk => "CLK", PinRole.Lat => "LAT",
             PinRole.Oe => "OE", PinRole.A => "A", PinRole.B => "B", PinRole.C => "C", PinRole.D => "D",
             _ => "OTH",
@@ -25,6 +25,7 @@ namespace CasinoSignTool
 
         public static PinRole FromCode(string c)
         {
+            if (string.Equals(c, "5V", StringComparison.OrdinalIgnoreCase)) return PinRole.V5;   // maps saved before 1.1.3
             foreach (var r in All) if (string.Equals(Code(r), c, StringComparison.OrdinalIgnoreCase)) return r;
             return PinRole.Unknown;
         }
@@ -33,7 +34,7 @@ namespace CasinoSignTool
         {
             PinRole.Unknown => "Unknown (not tested yet)",
             PinRole.GND => "GND (ground)",
-            PinRole.V5 => "+5V (power)",
+            PinRole.V5 => "+3.3V (power; the V-002 runs at 3.3 V)",
             PinRole.NC => "Not connected / does nothing",
             PinRole.DataTop => "DATA (serial data, top half or only line)",
             PinRole.DataBot => "DATA 2 (serial data, bottom half)",
@@ -139,6 +140,7 @@ namespace CasinoSignTool
         {
             var m = Json.Read<HeaderMap>(File.ReadAllText(path)) ?? new HeaderMap();
             m.Pins = m.Pins.OrderBy(p => p.Number).ToList();
+            foreach (var p in m.Pins) p.Role = Roles.Code(Roles.FromCode(p.Role));   // old "5V" becomes "3V3"
             m.EnsurePins();
             return m;
         }
@@ -189,7 +191,7 @@ namespace CasinoSignTool
         public string LastPort { get; set; } = "";
         public string LastHost { get; set; } = "casinosign.local";
         public bool AutoConnect { get; set; } = true;
-        public bool NoShifter { get; set; }                    // wiring guide: direct 3.3 V drive, no 74HCT245          // find the sign on WiFi when the app opens
+        public bool NoShifter { get; set; } = true;                    // wiring guide: direct 3.3 V drive, no 74HCT245          // find the sign on WiFi when the app opens
         public string OtaPass { get; set; } = "casinosign";
         public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CasinoSignTool");
         static string FilePath => Path.Combine(Dir, "settings.json");

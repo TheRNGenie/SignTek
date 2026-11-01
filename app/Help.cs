@@ -23,7 +23,7 @@ namespace CasinoSignTool
             new HelpTopic { Id = "overview", Title = "What this project does", Summary = "",
                 Body =
 @"# What this project does
-The casino sign (Neurizon ED0204-24, 96 x 16 LEDs) was driven by its own controller board, the CPU-002. This project replaces the CPU-002 with the Freenove 4"" ESP32 touch-screen board. The ESP32 talks to the sign's LED panels over the same 50-pin ribbon cable, through a small 74HCT245 chip that turns the ESP32's 3.3 V signals into the 5 V the sign expects.
+The casino sign (Neurizon ED0204-24, 96 x 16 LEDs) was driven by its own controller board, the CPU-002. This project replaces the CPU-002 with the Freenove 4"" ESP32 touch-screen board. The ESP32 talks to the sign's LED panels over the same 50-pin ribbon cable. The V-002 controller measures 3.3 V on its pins, so the ESP32 (also 3.3 V) can drive the panels directly, without a 74HCT245 level shifter.
 
 After the one-time setup, everything is wireless: this app finds the sign on your WiFi, and you can change text, playlists, animations and settings, run Fight Night, and even install new firmware without ever plugging in a cable again.
 
@@ -44,7 +44,7 @@ After the one-time setup, everything is wireless: this app finds the sign on you
 @"# Parts and tools you need
 ## Required
 - The Freenove 4"" ESP32 display board and a USB data cable for it (some cables only charge; if Windows doesn't see the board, try another cable).
-- A 74HCT245 chip (it must be HCT, not HC or LS: HCT reads 3.3 V as a valid high while running at 5 V). One chip handles 8 signals; the wiring guide tells you if you need a second one. Don't have one yet? The wiring guide has a ""No level shifter"" option for a test setup without it (it may or may not work reliably).
+- Optional, only for a 5 V controller (the V-002 is 3.3 V, so you don't need it): a 74HCT245 chip (it must be HCT, not HC or LS: HCT reads 3.3 V as a valid high while running at 5 V). One chip handles 8 signals; the wiring guide tells you if you need a second one. Don't have one yet? The wiring guide has a ""No level shifter"" option for a test setup without it (it may or may not work reliably).
 - A small breadboard or perfboard, and jumper wires (male-to-female are handiest for the ribbon connector).
 - A 50-pin IDC connector or the sign's original ribbon cable, so you can plug into the panels without cutting anything.
 - A multimeter with a continuity beeper (to find ground and 5 V pins).
@@ -116,7 +116,7 @@ This firmware leaves Bluetooth out, because Bluetooth and wireless firmware upda
                 Body =
 @"# Before you open the sign: safety
 ! Unplug the sign from the wall before opening it, and every time you connect or move wires. The power supply inside carries mains voltage.
-! Never connect anything to a pin you have marked GND or 5V except the matching GND or 5V wire.
+! Never connect anything to a pin you have marked GND or 3V3 (power) except the matching wire.
 ! Never connect a 5 V signal straight to an ESP32 pin. ESP32 pins are 3.3 V only. For a 5 V controller use the 10k/20k divider for sniffing and the 74HCT245 for driving. If the controller's pins measure 3.3 V (Logan's V-002 does), sniff through a single 10k and drive with the No level shifter wiring.
 
 ## Grounds
@@ -135,7 +135,7 @@ The firmware has safety features: a brightness limit (tab 2, Safety max), an aut
 The ribbon cable between the CPU-002 and the LED panels has 50 pins. You need to find which ones carry the signals the sign needs. Most pins are ground or unused; usually only 6 to 10 matter.
 
 ## What you're looking for
-- GND (ground) and 5V (power): found with the multimeter.
+- GND (ground) and 3V3 (power; the V-002 runs at 3.3 V): found with the multimeter.
 - DATA: the pixel data (sometimes two: top half and bottom half).
 - CLK: the clock that shifts data along the row.
 - LAT (or LE): the latch that copies the shifted data to the LEDs.
@@ -144,13 +144,13 @@ The ribbon cable between the CPU-002 and the LED panels has 50 pins. You need to
 
 ## Using the pin graphic
 - Click a pin to select it; arrow keys move between pins.
-- Keys: G = GND, V = 5V, N = not connected, or pick a role from the list on the right.
+- Keys: G = GND, V = 3V3 power, N = not connected, or pick a role from the list on the right.
 - If the picture is mirrored compared to your connector, tick the flip option. Pin 1 is usually marked with a triangle or a red stripe on the cable.
 - The map saves by itself on this PC. Press Send map to board to keep a copy on the ESP32 too.
 
 ## Method 1: multimeter (power OFF, finds almost everything)
 Set the meter to continuity (beep). With the sign unplugged you can trace every ribbon pin to the chips on the LED boards. No power, no risk.
-- GND and 5V: touch one lead to the sign's metal chassis or a power-supply ground and the other to each pin. Beep = GND. Then do the same against the 5 V terminal of the sign's power supply. Beep = 5V.
+- GND and 5V: touch one lead to the sign's metal chassis or a power-supply ground and the other to each pin. Beep = GND. Power pins: with the controller powered, multimeter on DC volts, black lead on ground, red on each pin; a steady 3.3 V (3.37 V on the V-002) means a power pin. Mark it 3V3.
 - No beeps for ground? The metal case often isn't connected to the electronics. Use one of these instead: the power supply's low-voltage terminal marked V−, −, COM or GND (never the mains side marked L / N / AC); pin 1 of an MBI5170 on an LED board; or the striped (minus) leg of a big round capacitor on an LED board. On 50-pin cables many pins are ground, often every other pin. Check the meter first: touching its two leads together should beep.
 - Driver chips: find the MBI5170 (16 legs) nearest the ribbon connector. Pin 1 is next to the dot or notch; pins count down one side and back up the other. Beep each ribbon pin against its legs: pin 2 = DATA, pin 3 = CLK, pin 4 = LAT, pin 13 = OE. Pin 1 should beep to GND and pin 16 to 5V, which proves you're counting right.
 - CLK, LAT and OE go to every driver chip. DATA only goes to the first chip in a chain (each next chip gets it from the previous chip's pin 14). If a chip on the other half of the sign has its pin 2 on a different ribbon pin, mark that one DATA 2.
@@ -171,7 +171,7 @@ You need: one 10 kΩ resistor (plus a 20 kΩ, or two more 10 kΩ, only for a 5 V
 - 4. Power the sign the normal way with the CPU-002 still plugged into the panels by its ribbon, so it shows its usual display. Without the ribbon the CPU-002 may get no power and every pin reads 0 Hz. Keep hands away from the power supply.
 - 4b. Test the lead first. 3.3 V board: touch the probe tip to the controller pin that reads about 3.3 V on the multimeter and press Sniff; it should say about 100% high. 5 V board: touch a 5 V pin (the ESP32 board's own Serial plug on its bottom edge, first pin, is 5 V; pins are 5V, GND, TX0, RX0); about 100% high. Then touch a GND pin: about 0% high. If the high test says 0%: check the lead goes to IO39, the ground from step 2 is connected, and (3.3 V board) that there's no resistor from IO39 to ground.
 - 5. Touch the probe tip to a pin. The easiest spot is the solder joints on the back of the board where the 50-pin socket is soldered. Click the same pin number on the picture and press Sniff this pin (or Space). If the suggestion looks right, press Use suggestion.
-- 6. Pick the next pin and repeat. Skip pins already marked GND or 5V.
+- 6. Pick the next pin and repeat. Skip pins already marked GND or 3V3.
 What the readings mean:
 - Very fast and steady: CLK.
 - A short blip regularly: LAT.
@@ -179,11 +179,19 @@ What the readings mean:
 - A wide on/off signal: OE. Busy and messy: DATA.
 - Never changes: not used, or a power pin.
 
+## After sniffing: picking out the pins the ESP32 needs
+- Every pin reads 0 Hz, even the power pins? Change Sniff GPIO to 35 and try again: the yellow wire may be on the IO plug's other pin (Logan's works on 35).
+- Sniffing sorts the pins into ground (always 0%), power (always 100%, 0 Hz) and active signal lines. Its OE/LAT/CLK suggestions are guesses: the ESP32 listens too slowly to tell a fast clock from a data line for sure.
+- To drive the sign you only need about 8 lines: CLK, LAT, OE, DATA (one per panel section, sometimes more) and the row lines A, B, C (and D on 1/16-scan panels).
+- Surest way to find them: a beep test on the PANEL side. Sign unplugged, multimeter on continuity. One lead on a pin of the panel's ribbon socket, the other on the legs of the nearest MBI5170: leg 2 = DATA, leg 3 = CLK, leg 4 = LAT, leg 13 = OE. Row chip (HZ81731G, 16 legs): legs 1, 2, 3 = A, B, C. Skip pins you already know are ground or power.
+- CLK, LAT and OE are usually shared by every driver chip, so one beep each is enough. DATA may differ per panel: check the first MBI5170 of each panel.
+- Mark each pin in tab 1 as you find it. Still unsure about some? A cheap USB logic analyzer (8 channels, 24 MHz, about $10) settles it. Its USB cable goes into the PC, not the sign: its 8 wire clips go onto 8 pins of the controller's connector plus one onto GND, and the free PulseView program on the PC shows all 8 signals at once as lines, hundreds of times faster than the ESP32 can listen. CLK looks like fast bursts of ticks, DATA changes in step with CLK, LAT is one short blip after each burst, OE is a long on/off signal, A/B/C step slowly (A fastest).
+
 ## Method 3: probe (only if needed, CPU-002 UNPLUGGED)
-- Build the probe lead: ESP32 probe GPIO (default 25, the SCL pin on the board's I2C connector) > 74HCT245 input, its output > 1 kΩ > test lead. The 74HCT245 needs 5 V on pin 20, GND on pin 10, pin 1 (DIR) to 5 V, pin 19 (OE) to GND.
+- Build the probe lead: ESP32 probe GPIO (default 25, the SCL pin on the board's I2C connector) > 1 kΩ resistor > test lead, and join the ESP32 GND to a sign GND pin. No 74HCT245 or voltage step is needed: the V-002 and its panels run at 3.3 V, the same as the ESP32. The 1 kΩ protects both sides if you touch the wrong pin.
 - Unplug the CPU-002 from the ribbon. Touch the test lead to a pin, press High, Low or Pulse, and watch the sign. The output switches off by itself after the timeout.
 - What you'll see: CLK or DATA pulses make random dots or smears; LAT makes the pattern change in steps; OE makes everything flash; an address line moves which row is lit.
-! Never probe a pin marked GND or 5V.
+! Never probe a pin marked GND or 3V3 (power).
 
 ## A logic analyzer is the fastest way
 If you have one, connect its ground to a sign GND, clip channels onto 8 unknown pins at a time while the CPU-002 runs, and record. In the recording CLK is the fastest regular signal, LAT pulses once after each burst of CLK, OE toggles around LAT, A/B/C count in binary, and DATA changes in step with CLK. Mark what you find in the app.

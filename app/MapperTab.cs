@@ -181,7 +181,7 @@ namespace CasinoSignTool
             {
                 AutoSize = true, MaximumSize = new Size(760, 0), Padding = new Padding(4),
                 Text = "How to map the header (click a pin, then):\n" +
-                       "  Step 1, power OFF, multimeter: beep each pin to the chassis (G) and the 5V rail (V), then to the driver chip legs: MBI5170 pin 2 = DATA, 3 = CLK, 4 = LAT, 13 = OE (? Help has the full steps).\n" +
+                       "  Step 1, power OFF, multimeter: beep each pin to the chassis (G) and the power rail (V, 3.3 V on the V-002), then to the driver chip legs: MBI5170 pin 2 = DATA, 3 = CLK, 4 = LAT, 13 = OE (? Help has the full steps).\n" +
                        "  Step 2, safest, CPU-002 still plugged in and running: clip the sniff lead onto a pin and press Sniff. 3.3 V controller (V-002 measures 3.37 V): lead = one 10k to IO39, nothing to ground. 5 V controller: 10k/20k divider (Show breadboard picture). Test the lead first on a pin at full voltage: it must read about 100% high.\n" +
                        "  Step 3, only if needed, CPU-002 UNPLUGGED: touch the probe lead (through a 1k resistor) to a pin and blink it. Watch the sign to see what reacts.\n" +
                        "Arrow keys move between pins. The map saves itself; use \"Send map to board\" to keep a copy on the ESP32.",
@@ -290,7 +290,7 @@ namespace CasinoSignTool
 
             // ---- Probe (active) ----
             side.Controls.Add(H("Probe the pin (CPU-002 unplugged)"));
-            side.Controls.Add(P("Wire: ESP32 probe GPIO → 74HCT245 → 1k resistor → test lead. Never probe pins marked GND or 5V. Outputs switch off by themselves after the timeout."));
+            side.Controls.Add(P("Wire: ESP32 probe GPIO → 1k resistor → test lead. No 74HCT245 needed: the V-002 and its panels run at 3.3 V like the ESP32. Never probe pins marked GND or 3V3. Outputs switch off by themselves after the timeout."));
             var prow = new FlowLayoutPanel { AutoSize = true };
             prow.Controls.Add(new Label { Text = "Probe GPIO:", AutoSize = true, Margin = new Padding(0, 7, 2, 0) });
             _probeGpio = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 60 };
@@ -433,7 +433,7 @@ namespace CasinoSignTool
             if (saturated || hz > 300_000) return (PinRole.Clk, "CLK. It is the fastest signal on the bus.");
             if (hz < 0.5)
             {
-                if (duty > 50) return (PinRole.Unknown, "steady HIGH. Could be 5V (check with the meter), or an idle line that's held high.");
+                if (duty > 50) return (PinRole.Unknown, "steady HIGH. Could be a 3.3V power pin (check with the meter), or an idle line that's held high.");
                 return (PinRole.Unknown, "steady LOW. Could be GND, a line that isn't used, or nothing connected. Check with the meter.");
             }
             if (duty >= 35 && duty <= 65 && hz < 20_000)

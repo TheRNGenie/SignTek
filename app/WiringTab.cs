@@ -70,7 +70,7 @@ namespace CasinoSignTool
             void A(string sec, string t) => s.Add((sec, t));
             const string S0 = "Before you start (no level shifter)", S1 = "Ground first", S2 = "Signals (ESP32 → resistor → header)", S3 = "Leave these alone", S4 = "Power the ESP32", S5 = "Bring it up";
 
-            A(S0, "This is a test setup without the 74HCT245. The sign's chips run at 5 V and officially want about 3.5 V for a \"high\" signal; the ESP32 only gives 3.3 V. Many signs still work this way, but you may see flicker, random dots, a shifted picture, or nothing at all. If that happens, the 74HCT245 is the fix (untick \"No level shifter\" above for that wiring).");
+            A(S0, "Direct wiring, no 74HCT245. The V-002 controller measures 3.37 V on its pins, so the panels already work with 3.3 V signals, the same as the ESP32. If you ever see flicker, random dots or a shifted picture, lower Refresh (Hz) in tab 2 and keep the wires short.");
             A(S0, "Unplug the sign from the wall. Its power supply has mains on the input side.");
             A(S0, "Unplug the 50-pin ribbon from the CPU-002 board and keep the CPU-002 somewhere safe.");
             A(S0, $"Parts: a 50-pin (2x25) IDC male header or breakout to plug the ribbon into, {Runs.Count} resistors of 100 to 330 Ω (220 Ω is ideal), one 10 kΩ resistor, and short jumper wires.");
@@ -82,8 +82,8 @@ namespace CasinoSignTool
                 ? $"Header GND pins {Pins(GndPins)} → the same common ground. Connect every one of them."
                 : "Header GND: none marked yet! Find the ground pins (tab 1, multimeter step) before going on.");
             A(S1, V5Pins.Count > 0
-                ? $"Header 5V pins {Pins(V5Pins)}: leave them unconnected. 5 V must never touch an ESP32 pin; it would destroy it."
-                : "Never connect the sign's 5 V to any ESP32 pin; it would destroy it.");
+                ? $"Header power pins {Pins(V5Pins)}: leave them unconnected. The ESP32 gets its power from USB."
+                : "Don't connect the sign's power pins or its 5 V supply to any ESP32 signal pin.");
 
             foreach (var r in Runs)
             {
@@ -423,11 +423,11 @@ namespace CasinoSignTool
                 g.DrawLine(gp, xHdr + wHdr, yG, xEsp, yG);
                 g.DrawString("GND", fb, Brushes.Black, new RectangleF(xEsp + 6, yG - rowH / 2, wEsp, rowH), left);
             }
-            string v = Plan.V5Pins.Count == 0 ? "5V" : "5V pin " + string.Join(",", Plan.V5Pins);
+            string v = Plan.V5Pins.Count == 0 ? "3.3V power" : "3.3V power pin " + string.Join(",", Plan.V5Pins);
             g.DrawString(v, f, Brushes.DarkRed, new RectangleF(xHdr + 6, yV - rowH / 2, wHdr - 8, rowH), left);
             using (var vp = new Pen(Color.Red, 3f)) g.DrawLine(vp, xHdr + wHdr, yV, xHdr + wHdr + 30, yV);
             g.DrawString("✕ leave unconnected: never to an ESP32 pin", f, Brushes.DarkRed, xHdr + wHdr + 36, yV - 8);
-            g.DrawString("3.3 V signals may be too weak for the sign's 5 V chips. Flicker or garbage → add the 74HCT245.", f, Brushes.DarkOrange,
+            g.DrawString("The V-002 runs at 3.3 V, so the ESP32 drives the panels directly. Leave the header's power pins unconnected.", f, Brushes.DarkGreen,
                 new RectangleF(area.Left + 10, top + bodyH + 8, area.Width - 20, 40), cen);
             if (runs.Count == 0)
                 g.DrawString("No signals yet: map the header (tab 1) and pick GPIOs (tab 2).", fb, Brushes.Gray, new RectangleF(area.Left, top, area.Width, rowH * 2), cen);
