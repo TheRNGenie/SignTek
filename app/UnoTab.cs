@@ -320,8 +320,22 @@ namespace CasinoSignTool
             finally { _busy = false; _flash.Enabled = true; RefreshPorts(); }
         }
 
+        // bossac keeps whatever line settings the port had last. The Uno's USB chip only answers the PC while
+        // DTR is on, so switch DTR/RTS on (and flow control off) before every bossac run.
+        static void PrepPort(string port)
+        {
+            try
+            {
+                using var sp = new SerialPort(port, 115200) { DtrEnable = true, RtsEnable = true, Handshake = Handshake.None };
+                sp.Open(); System.Threading.Thread.Sleep(30); sp.Close();
+            }
+            catch { }
+        }
+
         Task<int> RunBossac(string args)
         {
+            var m = System.Text.RegularExpressions.Regex.Match(args, @"--port=(\S+)");
+            if (m.Success) PrepPort(m.Groups[1].Value);
             Log("bossac " + args);
             var tcs = new TaskCompletionSource<int>();
             var psi = new ProcessStartInfo(BossacPath, args)

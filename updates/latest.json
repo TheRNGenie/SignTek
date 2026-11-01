@@ -1,6 +1,6 @@
 {
-  "version": "1.8.4",
+  "version": "1.8.5",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 14307515,
-  "notes": "- Uno install keeps trying for 20 seconds while you double-press the Uno's RESET button, so the timing no longer matters."
+  "size": 14307804,
+  "notes": "- Uno install: switches the port's DTR line on before each try (the Uno's USB chip stays silent without it). Keeps trying for 20 s while you double-press RESET."
 }
