@@ -1,6 +1,6 @@
 {
-  "version": "1.7.2",
+  "version": "1.7.3",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 9004405,
-  "notes": "- Panel test wiring picture cleaned up: the ESP32's SPI and I2C plugs drawn with their printed labels, one 220 ohm per signal, and the panel header upright.\n- Includes firmware 3.4.0 and tab 1c. Panel test."
+  "size": 9011065,
+  "notes": "- Panel test wiring fixed: on the panel header, ground (15) and clock (16) are at the BOTTOM and pins 1-2 at the top, the same as the header you measured.\n- Includes firmware 3.4.0 and tab 1c. Panel test."
 }

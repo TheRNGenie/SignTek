@@ -235,7 +235,7 @@ Needs sign firmware 3.4.0 or newer (tab 0).
 
 ## Wiring (sign unplugged)
 - Leave the grey ribbon between panel 1 and panel 2 unplugged, and leave both row processors in.
-- Wire to the SECOND panel's INPUT header: the LEFT header of the pair (next to U2 and U3), where the other end of that ribbon plugged in. Same layout as the right-hand header: pins 1 and 2 at the bottom (red-stripe side), 15 and 16 at the top. Check the column first: sign off, beep the two top pins to the big capacitor's minus leg; the one that beeps is pin 15.
+- Wire to the SECOND panel's INPUT header: the LEFT header of the pair (next to U2 and U3), where the other end of that ribbon plugged in. Same layout as the right-hand header: ground (15) and clock (16) at the BOTTOM, pins 1 and 2 at the top. Check the column first: sign off, beep the two bottom pins to the big capacitor's minus leg; the one that beeps is pin 15.
 ! Do NOT wire to the header next to U34, U24 and U29. That is panel 1's output; it is already driven and the two would fight.
 - Each signal: ESP32 pin > 220 Ω resistor (red-red-brown) > panel pin. Ground: ESP32 GND (I2C plug) > panel pin 15, no resistor. No 10 kΩ on OE for this test.
 - Pin 16 CLK > GPIO 18 (SPI plug IO18). Pin 6 LAT > GPIO 19 (SPI IO19). Pin 5 OE > GPIO 21 (SPI IO21).
