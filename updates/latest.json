@@ -1,6 +1,6 @@
 {
-  "version": "1.2.3",
+  "version": "1.2.4",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8697701,
-  "notes": "- Logic analyzer: shows your pin map as the 50-pin socket (GND, 3V3, busy, identified, already recorded).\n- Import a map file, click pins to put them on channels, and Pick the next 8 pins to check (keeps CLK and LAT on channels 1-2 once found)."
+  "size": 8700118,
+  "notes": "- Logic analyzer no longer labels pins when a capture has no clock in it (that gave conflicting results).\n- Warns when the map has more than one CLK or LAT.\n- Every capture is saved; Save my captures as one file makes a zip to send.\n- Clear analyzer results button."
 }

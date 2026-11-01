@@ -122,7 +122,14 @@ namespace CasinoSignTool
             _apply = new Button { Text = "Put results in the pin map", AutoSize = true, Enabled = false };
             _apply.Click += (s, e) => ApplyToMap();
             brow.Controls.Add(_capture); brow.Controls.Add(_apply);
+            var srow = new FlowLayoutPanel { AutoSize = true };
+            var saveAll = new Button { Text = "Save my captures as one file (to send)", AutoSize = true };
+            saveAll.Click += (s, e) => SaveCaptures();
+            var clearRes = new Button { Text = "Clear analyzer results", AutoSize = true };
+            clearRes.Click += (s, e) => ClearResults();
+            srow.Controls.Add(saveAll); srow.Controls.Add(clearRes);
             left.Controls.Add(brow);
+            left.Controls.Add(srow);
             _state = new Label { AutoSize = true, MaximumSize = new Size(445, 0), Font = new Font(Font, FontStyle.Bold) };
             left.Controls.Add(_state);
             left.Controls.Add(P("Reading the picture: scroll the mouse wheel to zoom, drag to move. Fastest speed covers a few milliseconds (one or two rows of the sign); 100 kHz covers about half a second (many full frames)."));
@@ -161,7 +168,10 @@ namespace CasinoSignTool
             var cand = _ctx.Map.Pins.Where(p => !Skip(p) && p.R != PinRole.NC).ToList();
             int done = cand.Count(p => p.LaChecked);
             var known = _ctx.Map.Pins.Where(Confirmed).Select(p => $"{p.Number}={Roles.Code(p.R)}").ToList();
-            _progress.Text = $"{done} of {cand.Count} pins worth checking have been recorded." + (known.Count > 0 ? " Identified so far: " + string.Join(", ", known) + "." : "");
+            var dup = new[] { PinRole.Clk, PinRole.Lat }.Where(r => _ctx.Map.Pins.Count(p => p.R == r && Confirmed(p)) > 1).Select(Roles.Code).ToList();
+            _progress.Text = $"{done} of {cand.Count} pins worth checking have been recorded." + (known.Count > 0 ? " Identified so far: " + string.Join(", ", known) + "." : "") +
+                (dup.Count > 0 ? $" ⚠ Results conflict: more than one {string.Join(" and ", dup)}. A sign has only one of each, so some captures didn't include the real clock. Clear analyzer results and start again with Fastest speed." : "");
+            _progress.ForeColor = dup.Count > 0 ? Color.DarkRed : Color.DimGray;
         }
 
         void OnPinClicked(int pin)
@@ -206,6 +216,54 @@ namespace CasinoSignTool
             else _state.Text = $"Next to clip: {string.Join(", ", pick.Select((p, i) => $"ch{i + 1}=pin {p}"))}." + (keep.Count > 0 ? " CLK/LAT stay on channels 1-2 so the new pins can be compared against them." : "") + $" {Math.Max(0, todo.Count - (8 - keep.Count))} more pins after this round.";
         }
 
+        static string CapDir => System.IO.Path.Combine(AppSettings.Dir, "captures");
+
+        /// <summary>Every capture is kept on the PC so it can be looked at again or sent for a second opinion.</summary>
+        void AutoSave(string b64)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(CapDir);
+                var hdr = string.Join(",", _hdr.Select(h => ((int)h.Value).ToString()));
+                var gp = string.Join(",", Gpios);
+                var json = $"{{\"time\":\"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\",\"rate\":{_sampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"speed\":\"{_rate.SelectedItem}\",\"gpios\":[{gp}],\"header_pins\":[{hdr}],\"data\":\"{b64}\"}}";
+                System.IO.File.WriteAllText(System.IO.Path.Combine(CapDir, $"capture-{DateTime.Now:yyyyMMdd-HHmmss}.json"), json);
+            }
+            catch { }
+        }
+
+        void SaveCaptures()
+        {
+            if (!System.IO.Directory.Exists(CapDir) || System.IO.Directory.GetFiles(CapDir, "*.json").Length == 0) { _state.ForeColor = Color.DarkRed; _state.Text = "No captures saved yet. Press Capture first."; return; }
+            using var d = new SaveFileDialog { Filter = "Zip file (*.zip)|*.zip", FileName = $"sign-captures-{DateTime.Now:yyyyMMdd-HHmm}.zip" };
+            if (d.ShowDialog(FindForm()) != DialogResult.OK) return;
+            try
+            {
+                if (System.IO.File.Exists(d.FileName)) System.IO.File.Delete(d.FileName);
+                var tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sign-captures-" + Guid.NewGuid().ToString("N"));
+                System.IO.Directory.CreateDirectory(tmp);
+                foreach (var fn in System.IO.Directory.GetFiles(CapDir, "*.json")) System.IO.File.Copy(fn, System.IO.Path.Combine(tmp, System.IO.Path.GetFileName(fn)));
+                try { _ctx.Map.Save(System.IO.Path.Combine(tmp, "sign-header-map.json")); } catch { }
+                System.IO.Compression.ZipFile.CreateFromDirectory(tmp, d.FileName);
+                System.IO.Directory.Delete(tmp, true);
+                _state.ForeColor = Color.DarkGreen;
+                _state.Text = $"Saved {System.IO.Directory.GetFiles(CapDir, "*.json").Length} captures and your pin map in {System.IO.Path.GetFileName(d.FileName)}.";
+            }
+            catch (Exception ex) { _state.ForeColor = Color.DarkRed; _state.Text = "Couldn't save: " + ex.Message; }
+        }
+
+        void ClearResults()
+        {
+            if (MessageBox.Show(FindForm(), "Forget every result the logic analyzer put in the pin map (and the ✓ marks)? GND, 3V3 and NC pins are kept. Saved captures are kept too.", "Clear analyzer results", MessageBoxButtons.OKCancel) != DialogResult.OK) return;
+            foreach (var p in _ctx.Map.Pins)
+            {
+                if (Confirmed(p) || (Roles.Signals.Contains(p.R) && p.LaChecked)) { p.R = PinRole.Unknown; p.Note = ""; }
+                p.LaChecked = false;
+            }
+            _ctx.RaiseMap();
+            _state.ForeColor = SystemColors.ControlText; _state.Text = "Analyzer results cleared.";
+        }
+
         void FillFromMap()
         {
             var busy = _ctx.Map.Pins.Where(p => p.SniffHz > 0 && p.R != PinRole.GND && p.R != PinRole.V5).Select(p => p.Number).ToList();
@@ -236,6 +294,7 @@ namespace CasinoSignTool
                 _sampleRate = r.Dbl("rate");
                 bool trigOk = trig < 0 || r.Bool("triggered");
                 _last = Analysis.Run(_data, _sampleRate);
+                AutoSave(r.Str("cap"));
                 for (int i = 0; i < 8; i++) if (_hdr[i].Value > 0) _ctx.Map[(int)_hdr[i].Value].LaChecked = true;
                 _ctx.RaiseMap();
                 _wave.SetData(_data, _sampleRate, Labels());
@@ -424,8 +483,21 @@ namespace CasinoSignTool
                 double gapMin = Math.Max(8, medStep * 6);
                 for (int i = 1; i < ce.Count; i++) if (ce[i] - ce[i - 1] >= gapMin) gaps.Add((ce[i - 1], ce[i]));
             }
-            bool bursty = gaps.Count >= 2;
-            if (bursty) { a.ClockCh = clk; }
+            // A real shift clock ticks many times per burst (at least once per column chip, usually dozens of times).
+            bool bursty = gaps.Count >= 2 && ce.Count / (double)(gaps.Count + 1) >= 16;
+            if (!bursty)
+            {
+                foreach (var c in active)
+                {
+                    var ci = a.Ch[c]; ci.Code = "?";
+                    ci.Guess = "active, but can't be identified from this capture";
+                    ci.Why = "no channel in this capture looks like a clock, so there's nothing to compare against.";
+                }
+                a.Summary = "No shift clock in this capture: none of the 8 channels ticks in bursts. Nothing was labelled, because without the clock the guesses would be wrong. " +
+                            "Use Fastest speed and clip other busy pins until a capture shows a clock (try the pins between the first two GND pairs, e.g. 6, 7, 8, 9, 12, 13, 14, 15).";
+                return a;
+            }
+            a.ClockCh = clk;
 
             bool InGap(int idx, int slack) => gaps.Any(g => idx >= g.s - slack && idx <= g.e + slack);
 
