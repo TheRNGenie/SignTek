@@ -56,7 +56,7 @@
 BluetoothSerial SerialBT;
 #endif
 
-#define FW_VERSION "3.2.0"
+#define FW_VERSION "3.2.1"
 
 constexpr uint16_t CMD_PORT = 3333;
 constexpr uint16_t DISCOVERY_PORT = 3334;
@@ -65,23 +65,23 @@ constexpr uint16_t DISCOVERY_PORT = 3334;
 // USB serial (1, 3), or the Freenove LCD/touch (12, 13, 14, 18, 19, 21, 22).
 // 0, 2, 5 and 15 are strapping pins: usable, but they can stop the board booting
 // if the sign pulls them the wrong way at power-up. The app warns about them.
-// Outputs the sign may use on the Freenove 4" board. 23/19/18/5 = SPI connector, 32/25 = I2C connector,
+// Outputs the sign may use on the Freenove 4" board. 23/19/18/21 = SPI connector (silk: IO23 MOSI, IO19 MISO, IO18 SCK, IO21 CS), 32/25 = I2C connector,
 // 0 = BOOT button pad, 22/16/17 = RGB LED pads, 26 = speaker input, 4 = speaker amp enable (solder points).
-const int OUT_PINS[]  = {23, 19, 18, 5, 32, 25, 0, 22, 16, 17, 26, 4};
+const int OUT_PINS[]  = {23, 19, 18, 21, 32, 25, 0, 22, 16, 17, 26, 4};
 const int IN_ONLY[]   = {39, 35};   // 39 is on the IO connector (good for sniffing); 34 = battery, 36 = touch IRQ
 const int STRAP_PINS[] = {0, 2, 5, 15};
 
 // ============================================================================
 // Runtime sign config (saved in flash)
 // ============================================================================
-constexpr uint8_t CFG_VERSION = 3;   // 3: Freenove 4" pin defaults (older saved configs used the screen's pins)
+constexpr uint8_t CFG_VERSION = 4;   // 4: OE default on GPIO 21 (the SPI plug has IO21, not IO5)
 SignConfig cfg;
 
 void cfgDefaults() {
   cfg = {};
   cfg.version = CFG_VERSION;
   cfg.scanRows = 8;
-  cfg.pinDataTop = 23; cfg.pinDataBot = -1; cfg.pinClk = 18; cfg.pinLat = 19; cfg.pinOe = 5;
+  cfg.pinDataTop = 23; cfg.pinDataBot = -1; cfg.pinClk = 18; cfg.pinLat = 19; cfg.pinOe = 21;
   cfg.pinAddr[0] = 32; cfg.pinAddr[1] = 25; cfg.pinAddr[2] = 0; cfg.pinAddr[3] = -1;
   cfg.oeActiveLow = 1; cfg.dataInvert = 0; cfg.addrInvert = 0; cfg.reverseCols = 0; cfg.chainBottomFirst = 1;
   cfg.refreshHz = 120;
@@ -402,13 +402,13 @@ SniffResult sniff(int pin, uint32_t ms) {
 // Channels (bit 0..7): the free pins on the Freenove board's plugs.
 // ============================================================================
 extern Stream* replyTo;
-const int LA_PINS[8] = {35, 39, 25, 32, 5, 18, 19, 23};
+const int LA_PINS[8] = {35, 39, 25, 32, 21, 18, 19, 23};   // channel 5 = IO21 (SPI plug CS)
 static const char B64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 static inline uint8_t laRead() {
   uint32_t a = REG_READ(GPIO_IN_REG), b = REG_READ(GPIO_IN1_REG);
   return ((b >> 3) & 1) | (((b >> 7) & 1) << 1) | (((a >> 25) & 1) << 2) | ((b & 1) << 3) |
-         (((a >> 5) & 1) << 4) | (((a >> 18) & 1) << 5) | (((a >> 19) & 1) << 6) | (((a >> 23) & 1) << 7);
+         (((a >> 21) & 1) << 4) | (((a >> 18) & 1) << 5) | (((a >> 19) & 1) << 6) | (((a >> 23) & 1) << 7);
 }
 
 // ---- Fast capture: the I2S peripheral in "camera" mode samples all 8 channels in hardware ----
@@ -599,7 +599,7 @@ String laCapture(uint32_t n, uint32_t rateHz, int trigCh, int trigEdge) {
     uint32_t* w = (uint32_t*)buf;
     for (uint32_t i = 0; i < n; i++) {
       uint32_t a = w[i];
-      buf[i] = (((a >> 25) & 1) << 2) | (((a >> 5) & 1) << 4) | (((a >> 18) & 1) << 5) | (((a >> 19) & 1) << 6) | (((a >> 23) & 1) << 7);
+      buf[i] = (((a >> 25) & 1) << 2) | (((a >> 21) & 1) << 4) | (((a >> 18) & 1) << 5) | (((a >> 19) & 1) << 6) | (((a >> 23) & 1) << 7);
     }
   }
 

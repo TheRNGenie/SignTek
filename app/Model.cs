@@ -174,12 +174,12 @@ namespace CasinoSignTool
     {
         public static string Where(int gpio) => gpio switch
         {
-            23 => "SPI connector, pin marked MOSI",
-            19 => "SPI connector, pin marked MISO",
-            18 => "SPI connector, pin marked CLK / SCK",
-            5  => "SPI connector, pin marked CS",
-            32 => "I2C connector, pin marked SDA",
-            25 => "I2C connector, pin marked SCL",
+            23 => "SPI connector, pin printed IO23 (MOSI)",
+            19 => "SPI connector, pin printed IO19 (MISO)",
+            18 => "SPI connector, pin printed IO18 (SCK)",
+            21 => "SPI connector, pin printed IO21 (CS)",
+            32 => "I2C connector, pin printed IO32 (SDA)",
+            25 => "I2C connector, pin printed IO25 (SCL)",
             39 => "IO connector (input only)",
             35 => "input only (solder point)",
             0  => "BOOT button: solder to the button pad that reads 3.3 V (the other pad is GND)",
@@ -221,7 +221,7 @@ namespace CasinoSignTool
     {
         public Dictionary<PinRole, int> Gpio = new Dictionary<PinRole, int>
         {
-            [PinRole.DataTop] = 23, [PinRole.DataBot] = -1, [PinRole.Clk] = 18, [PinRole.Lat] = 19, [PinRole.Oe] = 5,
+            [PinRole.DataTop] = 23, [PinRole.DataBot] = -1, [PinRole.Clk] = 18, [PinRole.Lat] = 19, [PinRole.Oe] = 21,
             [PinRole.A] = 32, [PinRole.B] = 25, [PinRole.C] = 0, [PinRole.D] = -1,
         };
         public int ScanRows = 8, RefreshHz = 120, Brightness = 100, BrightCap = 100;

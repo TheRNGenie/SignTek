@@ -15,9 +15,9 @@ namespace CasinoSignTool
         public HeaderMap Map = new HeaderMap();
         public SignCfg Cfg = new SignCfg();
         public Reply Info;                      // last INFO reply
-        public List<int> OutPins = new List<int> { 23, 19, 18, 5, 32, 25, 0, 22, 16, 17, 26, 4 };
-        public List<int> InPins = new List<int> { 39, 35, 23, 19, 18, 5, 32, 25, 0, 22, 16, 17, 26, 4 };
-        public List<int> StrapPins = new List<int> { 0, 5 };
+        public List<int> OutPins = new List<int> { 23, 19, 18, 21, 32, 25, 0, 22, 16, 17, 26, 4 };
+        public List<int> InPins = new List<int> { 39, 35, 23, 19, 18, 21, 32, 25, 0, 22, 16, 17, 26, 4 };
+        public List<int> StrapPins = new List<int> { 0 };
         public string Mode = "";                // "run" / "diag"
         public bool Power = true;               // sign on/off (POWER command)
 

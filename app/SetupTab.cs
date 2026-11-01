@@ -206,7 +206,7 @@ namespace CasinoSignTool
         void AutoAssign()
         {
             // Prefer non-strapping pins in this order, keep the classic layout when possible.
-            var preferred = new Dictionary<PinRole, int> { [PinRole.DataTop] = 23, [PinRole.Clk] = 18, [PinRole.Lat] = 19, [PinRole.Oe] = 5, [PinRole.A] = 32, [PinRole.B] = 25, [PinRole.C] = 0, [PinRole.D] = 22, [PinRole.DataBot] = 16 };
+            var preferred = new Dictionary<PinRole, int> { [PinRole.DataTop] = 23, [PinRole.Clk] = 18, [PinRole.Lat] = 19, [PinRole.Oe] = 21, [PinRole.A] = 32, [PinRole.B] = 25, [PinRole.C] = 0, [PinRole.D] = 22, [PinRole.DataBot] = 16 };
             var free = _ctx.OutPins.Where(p => !_ctx.StrapPins.Contains(p)).Concat(_ctx.OutPins.Where(p => _ctx.StrapPins.Contains(p) && p != 0)).ToList();
             var taken = new HashSet<int>();
             var result = new Dictionary<PinRole, int>();

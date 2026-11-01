@@ -1,6 +1,6 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8716846,
-  "notes": "- Logic analyzer: Fast 10 MHz (all 8 channels, exact timing) works on the board; the 20 MHz option is removed because it only repeated each 10 MHz sample.\n- No firmware change (keep 3.2.0)."
+  "size": 8730350,
+  "notes": "- New sign firmware 3.2.1: install it in tab 0. Logic analyzer channel 5 now records the SPI plug pin printed IO21 (it was GPIO 5, which isn't on your board's plugs).\n- Wiring pictures and channel labels now use the names printed next to each plug.\n- Sign OE output default moved from GPIO 5 to IO21.\n- Help: ground-wire check if captures disagree."
 }

@@ -141,7 +141,8 @@ Each channel: controller pin > 10 kΩ resistor > ESP32 pin. One extra wire joins
 - Channel 2: GPIO 39, IO plug, the other pin.
 - Channel 3: GPIO 25, I2C plug, the pin next to GND.
 - Channel 4: GPIO 32, I2C plug, the pin next to 3V3.
-- Channels 5 to 8: GPIO 5, 18, 19, 23: the SPI plug's 4 pins in order (the SD card slot must be empty).
+- Channels 5 to 8: the SPI plug pins printed IO21(CS), IO18(SCK), IO19(MISO), IO23(MOSI) (the SD card slot must be empty). Channel 5 needs firmware 3.2.1 or newer.
+! Go by the labels printed on the board next to each plug, and check the ground wire is on the pin printed GND. Without a ground connection the channels show jumbled signals that change from capture to capture.
 Press Show wiring picture (both boards) in the tab for a drawing of every wire. The IO plug: channel 1 (GPIO 35) is the pin your sniff wire already works on.
 
 ## Using it
@@ -151,7 +152,7 @@ Press Show wiring picture (both boards) in the tab for a drawing of every wire. 
 - 4. The Result column and the text box show the guess for each channel, with the reason. Press Put results in the pin map to save them in tab 1.
 - 5. Press Pick the next 8 pins to check again. Once CLK and LAT are found it keeps them on channels 1 and 2 and puts 6 pins that haven't been recorded yet on the rest. Move the clips to match and capture again. The line under the socket shows how many pins are left.
 - 6. For the row lines (A, B, C) and OE, also capture at 100 kHz: many rows fit into one capture, so the slow on/off pattern is clear.
-- Turbo speed records roughly 2 to 3 times faster than Fastest, but only on channels 3, 5, 6, 7 and 8 (GPIO 25, 5, 18, 19, 23), and for a shorter time (16,383 samples, about 2 ms). Use it when a pin changes faster than Fastest can follow: Fastest shows it as random single-sample blips. Needs firmware 3.1.1 or newer.
+- Turbo speed records roughly 2 to 3 times faster than Fastest, but only on channels 3, 5, 6, 7 and 8 (GPIO 25, 21, 18, 19, 23), and for a shorter time (16,383 samples, about 2 ms). Use it when a pin changes faster than Fastest can follow: Fastest shows it as random single-sample blips. Needs firmware 3.1.1 or newer.
 
 ## How it decides
 - CLK: the busiest line, ticking in bursts with pauses between.
@@ -197,7 +198,7 @@ In tab 1 (Pin mapper), choose Panel 16-pin grey ribbon at the top. It has its ow
 - In between (busy signal lines): pins 1, 2, 3, 4, 9, 10, 13, 16 (about 1.8 to 2.6 V), and pin 14 (0.2 V: mostly low with short pulses, typical of a latch).
 - Pin 5 at 3.1 V: mostly high with short low moments, typical of a blanking (OE) line or a slow signal.
 - Nothing above 3.3 V, and the input chip U2 runs at about 2.4 V: no level shifter needed. Supply across the big capacitors is 5 V.
-- Round 1 capture (pins 1, 2, 3, 4, 5, 9, 10, 13): pins 1 and 9 are clean square waves, pin 9 exactly 4 times faster than pin 1 (row address lines). Pin 2 slow data/control. Pins 5 and 13 always high. Pins 3, 4, 10 fast but choppy with 10 kΩ resistors: re-record with 1 kΩ.
+- The first capture rounds were recorded without a working ground connection, so their pin labels are not used.
 
 ## Step 3. Record the busy pins
 - 1. Check the highest voltage on the busy pins. If every pin is at or under about 3.6 V, wire each analyzer channel with a single 1 kΩ resistor (brown-black-red; 470 Ω is fine too). Don't use 10 kΩ here: the panel's high level is only about 2.5 V, right at the ESP32's limit, and 10 kΩ rounds off the fast edges so fast lines flicker.
@@ -207,7 +208,8 @@ In tab 1 (Pin mapper), choose Panel 16-pin grey ribbon at the top. It has its ow
 - 5. Press Save my captures as one file (to send) in the Logic analyzer tab and keep it: it holds everything needed to work out the signal format.
 
 ## Good to know
-- Channels 5 and 8 (GPIO 5 and 23, the SPI plug's 1st and 4th pins) are pulled up by the SD card slot. A sign pin that isn't driven, or a loose clip, reads as always HIGH on those two channels. If a pin shows always high there but your meter read about 0 V, record it again on another channel. Pick the next 8 pins uses these two channels last.
+- Firmware before 3.2.1 recorded channel 5 on GPIO 5, which isn't on any plug of this board (the SPI plug has IO21), so channel 5 always read high. Update the firmware.
+- If the channels disagree from one capture to the next (a pin that was a clean square wave turns into something else), check the ground wire first: on Logan's setup the ground and IO21 wires were swapped, and every capture was jumbled until it was fixed.
 - Use the Fast 10 MHz speed (below) for fast lines: all 8 channels with exact timing.
 - Keep one known pin (pin 9, row line A) on channel 1 in every round. Then every capture can be lined up against the same reference, and a wire on the wrong pin shows up straight away.
 
@@ -328,7 +330,7 @@ The Wiring guide tab builds the final connection list from your pin map (tab 1) 
 Tick ""No level shifter"" at the top of the Wiring guide tab. The diagram and steps switch to a direct setup: each ESP32 pin goes through a 220 Ω resistor straight to the header, grounds are joined, and the sign's 5 V stays off the ESP32. The sign's chips officially want about 3.5 V for a ""high"" and the ESP32 gives 3.3 V, so this may work fine, flicker, or not work at all. If it misbehaves, adding the 74HCT245 is the fix.
 
 ## Where the pins are on the Freenove board
-The default sign pins are on the board's SPI connector (GPIO 23, 19, 18, 5) and I2C connector (GPIO 32, 25), plus GPIO 0 on the BOOT button pad. The wiring guide shows the location next to each GPIO. Leave the SD card slot empty, because it shares the SPI connector's pins. The screen uses GPIO 2, 12, 13, 14, 15, 27 and 33, so those are never offered for the sign.
+The default sign pins are on the board's SPI connector (GPIO 23, 19, 18, 21) and I2C connector (GPIO 32, 25), plus GPIO 0 on the BOOT button pad. The wiring guide shows the location next to each GPIO. Leave the SD card slot empty, because it shares the SPI connector's pins. The screen uses GPIO 2, 12, 13, 14, 15, 27 and 33, so those are never offered for the sign.
 
 ## How to use it
 - Fix every warning at the top of the guide first (missing pins, GPIOs not set).

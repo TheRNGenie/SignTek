@@ -15,11 +15,11 @@ namespace CasinoSignTool
     /// </summary>
     public class LogicTab : UserControl
     {
-        public static readonly int[] Gpios = { 35, 39, 25, 32, 5, 18, 19, 23 };
+        public static readonly int[] Gpios = { 35, 39, 25, 32, 21, 18, 19, 23 };
         public static readonly string[] Where =
         {
-            "IO plug (the pin your sniff wire is on)", "IO plug (other pin)", "I2C plug, pin next to GND", "I2C plug, pin next to 3V3",
-            "SPI plug, 1st pin. Pulled high by the SD slot: a pin that isn't driven reads HIGH here", "SPI plug, 2nd pin", "SPI plug, 3rd pin", "SPI plug, 4th pin. Pulled high by the SD slot: a pin that isn't driven reads HIGH here",
+            "IO plug, pin printed IO35", "IO plug, pin printed IO39", "I2C plug, pin printed IO25(SCL)", "I2C plug, pin printed IO32(SDA)",
+            "SPI plug, pin printed IO21(CS). Needs firmware 3.2.1", "SPI plug, pin printed IO18(SCK)", "SPI plug, pin printed IO19(MISO)", "SPI plug, pin printed IO23(MOSI)",
         };
         static readonly Color[] TraceColors =
         {
@@ -55,7 +55,7 @@ namespace CasinoSignTool
             left.Controls.Add(H("Use the ESP32 as an 8-channel logic analyzer"));
             left.Controls.Add(P(
                 "It records 8 controller pins at the same moment and works out which one is CLK, LAT, OE, DATA and the row lines A, B, C.\n\n" +
-                "1. Wire each channel: controller pin → 10 kΩ resistor → the ESP32 pin listed below. Plus one wire from ESP32 GND (I2C plug) to a controller GND pin. (3.3 V controllers like the V-002 only; a 5 V controller needs the 10k/20k divider on every channel.)\n" +
+                "1. Wire each channel: controller pin → 10 kΩ resistor → the ESP32 pin listed below. Plus one wire from ESP32 GND (the I2C plug pin printed GND) to a controller GND pin. Go by the labels printed next to each plug. (3.3 V controllers like the V-002 only; a 5 V controller needs the 10k/20k divider on every channel.)\n" +
                 "2. Choose the pins: press Pick the next 8 pins to check (below), click pins on the socket picture, or type the header pin numbers (0 = not used).\n" +
                 "3. Power the sign normally (V-002 running). Connect the ESP32 by USB, press Capture. It takes about 6 seconds.\n" +
                 "4. Read the results, then press Put results in the pin map.\n\n" +
@@ -212,7 +212,7 @@ namespace CasinoSignTool
             var todo = map.Pins.Where(p => !Skip(p) && p.R != PinRole.NC && !p.LaChecked && !keep.Contains(p.Number))
                               .OrderByDescending(p => p.SniffHz > 0 || VoltsBusy(p)).ThenBy(p => p.Number).Select(p => p.Number).ToList();
             var pick = keep.Concat(todo).Take(8).ToList();
-            // Channels 5 and 8 (GPIO 5, 23) are pulled high by the SD slot, so they get pins last.
+            // Channel 5 (IO21) needs firmware 3.2.1 and channel 8 shares the SD slot, so they get pins last.
             int[] slots = { 0, 1, 2, 3, 5, 6, 4, 7 };
             for (int i = 0; i < 8; i++) _hdr[i].Value = 0;
             for (int i = 0; i < pick.Count; i++) _hdr[slots[i]].Value = pick[i];
@@ -282,7 +282,7 @@ namespace CasinoSignTool
         int RateHz => _rate.SelectedIndex switch { 1 => 1000000, 2 => 100000, 3 => 20000, 4 => 1, 5 => 3, _ => 0 };
         bool Fast => _rate.SelectedIndex == 5;
         bool Turbo => _rate.SelectedIndex == 4;
-        static readonly int[] TurboChannels = { 2, 4, 5, 6, 7 };   // 0-based: GPIO 25, 5, 18, 19, 23
+        static readonly int[] TurboChannels = { 2, 4, 5, 6, 7 };   // 0-based: GPIO 25, 21, 18, 19, 23
 
         async Task Capture()
         {
