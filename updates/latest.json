@@ -1,0 +1,6 @@
+{
+  "version": "1.1.0",
+  "zip": "updates/CasinoSignTool.zip",
+  "size": 8231726,
+  "notes": "- New: the app updates itself. It checks for a new version when it opens; press Update available in the top bar.\n- New: screen test firmware and Watch board output (tab 0) to find out why the built-in screen stays dark.\n- Sniff steps: test the lead on a 5V pin first; keep the V-002 ribbon connected.\n- Sign firmware 3.0.2."
+}

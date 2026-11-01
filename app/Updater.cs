@@ -13,7 +13,7 @@ using System.Windows.Forms;
 
 namespace CasinoSignTool
 {
-    /// <summary>Checks GitHub for a newer release of the app and installs it in place (app, firmware files and all).</summary>
+    /// <summary>Checks GitHub (updates/latest.json in the SignTek repo) for a newer version of the app and installs it in place (app, firmware files and all).</summary>
     public static class Updater
     {
         public const string Repo = "TheRNGenie/SignTek";
@@ -34,27 +34,30 @@ namespace CasinoSignTool
             return wc;
         }
 
-        /// <summary>Latest release on GitHub, or null if there is none. Throws on network errors.</summary>
+        // updates/latest.json in the repo: {"version":"1.2.0","notes":"...","zip":"updates/CasinoSignTool.zip","size":123}
+        const string Raw = "https://raw.githubusercontent.com/" + Repo + "/main/";
+
+        /// <summary>Latest published version, or null if there is none. Throws on network errors.</summary>
         public static async Task<Release> GetLatest()
         {
             string json;
             using (var wc = Client())
             {
-                try { json = await wc.DownloadStringTaskAsync($"https://api.github.com/repos/{Repo}/releases/latest"); }
+                try { json = await wc.DownloadStringTaskAsync(Raw + "updates/latest.json?t=" + DateTime.UtcNow.Ticks); }
                 catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound) { return null; }
             }
             var d = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
-            var tag = d.TryGetValue("tag_name", out var t) ? t as string ?? "" : "";
+            var tag = d.TryGetValue("version", out var t) ? t as string ?? "" : "";
             if (!Version.TryParse(tag.TrimStart('v', 'V'), out var ver)) return null;
-            var r = new Release { Version = ver, Tag = tag, Notes = d.TryGetValue("body", out var b) ? b as string ?? "" : "" };
-            if (d.TryGetValue("assets", out var a) && a is object[] assets)
-                foreach (var o in assets)
-                    if (o is Dictionary<string, object> asset && (asset["name"] as string) == AssetName)
-                    {
-                        r.ZipUrl = asset["browser_download_url"] as string;
-                        r.Size = Convert.ToInt64(asset["size"]);
-                    }
-            return r.ZipUrl == null ? null : r;
+            var zip = d.TryGetValue("zip", out var z) ? z as string : null;
+            if (string.IsNullOrEmpty(zip)) return null;
+            return new Release
+            {
+                Version = ver, Tag = tag,
+                Notes = d.TryGetValue("notes", out var b) ? b as string ?? "" : "",
+                ZipUrl = zip.StartsWith("http") ? zip : Raw + zip,
+                Size = d.TryGetValue("size", out var sz) ? Convert.ToInt64(sz) : 0,
+            };
         }
 
         static Version Norm(Version v) => new Version(v.Major, v.Minor, Math.Max(0, v.Build));
