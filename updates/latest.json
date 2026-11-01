@@ -1,6 +1,6 @@
 {
-  "version": "1.7.7",
+  "version": "1.8.0",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 9134382,
-  "notes": "- Panel test picture now traces every wire: ESP32 plug pin, through its 220 Ω on the breadboard, to its header pin, with the GND rail and the row C resistor shown."
+  "size": 14304568,
+  "notes": "- New tab 1d. Uno R4: install firmware on an UNO R4 WiFi (Arduino or Elegoo) straight from the app, wiring table and pictures (no soldering), and test patterns sent from the app."
 }

@@ -262,6 +262,32 @@ Needs sign firmware 3.4.0 or newer (tab 0).
 - Set Slow down to 50: the ESP32 then sends the clock more slowly, in case the wires are too long for full speed.
 - If the board says it doesn't know PTEST, install firmware 3.4.0 or newer in tab 0." },
 
+            new HelpTopic { Id = "uno", Title = "Uno R4: drive panel 2 without soldering", Tab = "1d. Uno R4",
+                Summary = "Install the Uno firmware from the app, wire 12 signals through 1 kΩ resistors, send test patterns.",
+                Body =
+@"# Uno R4: drive panel 2 without soldering
+The UNO R4 WiFi (Arduino or Elegoo) has enough header pins for all 12 panel signals, so nothing needs soldering. Tab 1d installs its firmware and sends it test patterns. It will also play back your recording from tab 1b once that is added. The ESP32 isn't used on this tab.
+
+## Install the Uno firmware (once)
+- Plug the Uno into the PC with a USB-C data cable.
+- Tab 1d: press Refresh, pick the port marked likely the Uno, press Install Uno firmware. It takes about 20 seconds.
+- If it fails: press the Uno's RESET button twice quickly (the L light fades in and out), press Refresh, pick the port again and press Install.
+
+## Wiring (sign and Uno unplugged)
+- Wire into the end of your ribbon plug as before, and plug it onto panel 2's input header. The grey ribbon stays off panel 1, and the row processors stay in.
+- Every signal: Uno pin > 1 kΩ resistor (brown-black-red) > panel pin. Ground: Uno GND (top row, next to 13) > panel pin 15, no resistor.
+! Use 1 kΩ, not 220 Ω. The Uno's outputs are 5 V, and the 1 kΩ keeps the panel's inputs safe.
+- 2 > pin 16 clock. 3 > pin 6 latch. 4 > pin 5 OE. 5 > pin 7 data 1. 6 > pin 9 timing, plus a link from 9 to 13. 7 > pin 2 timing 2.
+- 10 > pin 8 data 2. 11 > pin 4 row B. 12 > pin 1 row C. 13 > pin 3 row A. A4 > pin 10 data 3. A5 > pin 11 data 4.
+- Take out the old test resistors. Pins 12 and 14 stay empty.
+> The tab has a wiring picture and a photo of the Uno with every socket circled.
+
+## Test
+- Plug the Uno into the PC, press Connect, then plug the sign in.
+- Press Start test with All on. Panel 2 onward should light.
+- Nothing lights? Try one at a time: Clock edge = Falling; OE inverted; Latch inverted; Timing pins Always low, then Always high; Slow down = 20.
+- Photograph anything that lights and note which settings were on." },
+
             new HelpTopic { Id = "setup", Title = "Step 4. Sign setup and first light", Tab = "2. Sign setup",
                 Summary = "Pick an ESP32 GPIO for each signal, set the scan type, Apply, check the test patterns, Save.",
                 Body =
