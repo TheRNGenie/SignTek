@@ -56,7 +56,7 @@ namespace CasinoSignTool
             left.Controls.Add(P(
                 "It records 8 controller pins at the same moment and works out which one is CLK, LAT, OE, DATA and the row lines A, B, C.\n\n" +
                 "1. Wire each channel: controller pin → 10 kΩ resistor → the ESP32 pin listed below. Plus one wire from ESP32 GND (I2C plug) to a controller GND pin. (3.3 V controllers like the V-002 only; a 5 V controller needs the 10k/20k divider on every channel.)\n" +
-                "2. Type which header pin each channel is clipped to (0 = not used).\n" +
+                "2. Choose the pins: press Pick the next 8 pins to check (below), click pins on the socket picture, or type the header pin numbers (0 = not used).\n" +
                 "3. Power the sign normally (V-002 running). Connect the ESP32 by USB, press Capture. It takes about 6 seconds.\n" +
                 "4. Read the results, then press Put results in the pin map.\n\n" +
                 "Tip: first clip 8 of the busy pins from your sniff map. Once CLK and LAT are found, keep those two on channels 1 and 2 and move the other 6 clips to new pins each time, so every capture can be compared against the clock."));
@@ -79,9 +79,26 @@ namespace CasinoSignTool
             var pic = new Button { Text = "Show wiring picture (both boards)", AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
             pic.Click += (s, e) => ShowPicture();
             left.Controls.Add(pic);
-            var fill = new Button { Text = "Fill header pins with busy pins from my sniff map", AutoSize = true };
-            fill.Click += (s, e) => FillFromMap();
-            left.Controls.Add(fill);
+
+            left.Controls.Add(H("Your pin map: click pins to check next"));
+            left.Controls.Add(P("Black = GND, red = 3V3 power (never clip these), grey = dead. Coloured = already identified. White = busy, not identified yet (guesses from single-pin sniffing are ignored here). A ✓ means the analyzer has recorded that pin. Click a pin to put it on the next free channel; click it again to take it off."));
+            _picker = new PinPicker { Width = 445, Height = 96, Map = _ctx.Map, Channels = _hdr, ChannelColors = TraceColors };
+            _picker.PinClicked += OnPinClicked;
+            left.Controls.Add(_picker);
+            var mrow = new FlowLayoutPanel { AutoSize = true };
+            var imp = new Button { Text = "Import a map file…", AutoSize = true };
+            imp.Click += (s, e) => ImportMap();
+            var next = new Button { Text = "Pick the next 8 pins to check", AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
+            next.Click += (s, e) => PickNext();
+            var clr = new Button { Text = "Clear channels", AutoSize = true };
+            clr.Click += (s, e) => { foreach (var h in _hdr) h.Value = 0; };
+            mrow.Controls.Add(imp); mrow.Controls.Add(next); mrow.Controls.Add(clr);
+            left.Controls.Add(mrow);
+            _progress = new Label { AutoSize = true, MaximumSize = new Size(445, 0), ForeColor = Color.DimGray };
+            left.Controls.Add(_progress);
+            foreach (var h in _hdr) h.ValueChanged += (s, e) => _picker.Invalidate();
+            _ctx.MapChanged += () => { _picker.Map = _ctx.Map; _picker.Invalidate(); UpdateProgress(); };
+            UpdateProgress();
 
             var orow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
             orow.Controls.Add(new Label { Text = "Speed:", AutoSize = true, Margin = new Padding(0, 7, 2, 0) });
@@ -132,6 +149,63 @@ namespace CasinoSignTool
             f.Show(FindForm());
         }
 
+        PinPicker _picker;
+        Label _progress;
+
+        static bool Skip(HeaderPin p) => p.R == PinRole.GND || p.R == PinRole.V5;
+        /// <summary>Signal roles found by this analyzer. Roles guessed by single-pin sniffing aren't trusted here.</summary>
+        public static bool Confirmed(HeaderPin p) => Roles.Signals.Contains(p.R) && (p.Note ?? "").StartsWith("Logic analyzer");
+
+        void UpdateProgress()
+        {
+            var cand = _ctx.Map.Pins.Where(p => !Skip(p) && p.R != PinRole.NC).ToList();
+            int done = cand.Count(p => p.LaChecked);
+            var known = _ctx.Map.Pins.Where(Confirmed).Select(p => $"{p.Number}={Roles.Code(p.R)}").ToList();
+            _progress.Text = $"{done} of {cand.Count} pins worth checking have been recorded." + (known.Count > 0 ? " Identified so far: " + string.Join(", ", known) + "." : "");
+        }
+
+        void OnPinClicked(int pin)
+        {
+            var hp = _ctx.Map[pin];
+            _state.ForeColor = SystemColors.ControlText;
+            for (int i = 0; i < 8; i++) if (_hdr[i].Value == pin) { _hdr[i].Value = 0; _state.Text = $"Pin {pin} taken off channel {i + 1}."; return; }
+            if (Skip(hp)) { _state.ForeColor = Color.DarkRed; _state.Text = $"Pin {pin} is marked {Roles.Code(hp.R)} in your map. Don't clip a channel onto it."; return; }
+            for (int i = 0; i < 8; i++) if (_hdr[i].Value == 0) { _hdr[i].Value = pin; _state.Text = $"Pin {pin} → channel {i + 1} (GPIO {Gpios[i]}, {Where[i]})."; return; }
+            _state.Text = "All 8 channels are in use. Click a pin that's already on a channel to free it, or press Clear channels.";
+        }
+
+        void ImportMap()
+        {
+            using var d = new OpenFileDialog { Filter = "Header map (*.json)|*.json|All files|*.*", Title = "Import a pin map saved from tab 1" };
+            if (d.ShowDialog(FindForm()) != DialogResult.OK) return;
+            try
+            {
+                var m = HeaderMap.Load(d.FileName);
+                _ctx.Map = m;
+                _ctx.RaiseMap();
+                _state.ForeColor = Color.DarkGreen;
+                _state.Text = $"Imported {System.IO.Path.GetFileName(d.FileName)}: {m.Pins.Count(p => p.R == PinRole.GND)} GND, {m.Pins.Count(p => p.R == PinRole.V5)} 3V3, {m.Pins.Count(p => p.SniffHz > 0)} busy pins. It's now the map in tab 1 too.";
+            }
+            catch (Exception ex) { _state.ForeColor = Color.DarkRed; _state.Text = "Couldn't read that file: " + ex.Message; }
+        }
+
+        /// <summary>Keeps CLK and LAT (once found) on channels 1 and 2, fills the rest with pins not recorded yet: busy ones first.</summary>
+        void PickNext()
+        {
+            var map = _ctx.Map;
+            var keep = new List<int>();
+            var clk = map.Pins.FirstOrDefault(p => p.R == PinRole.Clk && Confirmed(p)); var lat = map.Pins.FirstOrDefault(p => p.R == PinRole.Lat && Confirmed(p));
+            if (clk != null) keep.Add(clk.Number);
+            if (lat != null) keep.Add(lat.Number);
+            var todo = map.Pins.Where(p => !Skip(p) && p.R != PinRole.NC && !p.LaChecked && !keep.Contains(p.Number))
+                              .OrderByDescending(p => p.SniffHz > 0).ThenBy(p => p.Number).Select(p => p.Number).ToList();
+            var pick = keep.Concat(todo).Take(8).ToList();
+            for (int i = 0; i < 8; i++) _hdr[i].Value = i < pick.Count ? pick[i] : 0;
+            _state.ForeColor = SystemColors.ControlText;
+            if (todo.Count == 0) _state.Text = "Every pin worth checking has been recorded. " + (keep.Count > 0 ? "CLK/LAT kept on channels 1-2." : "");
+            else _state.Text = $"Next to clip: {string.Join(", ", pick.Select((p, i) => $"ch{i + 1}=pin {p}"))}." + (keep.Count > 0 ? " CLK/LAT stay on channels 1-2 so the new pins can be compared against them." : "") + $" {Math.Max(0, todo.Count - (8 - keep.Count))} more pins after this round.";
+        }
+
         void FillFromMap()
         {
             var busy = _ctx.Map.Pins.Where(p => p.SniffHz > 0 && p.R != PinRole.GND && p.R != PinRole.V5).Select(p => p.Number).ToList();
@@ -162,6 +236,8 @@ namespace CasinoSignTool
                 _sampleRate = r.Dbl("rate");
                 bool trigOk = trig < 0 || r.Bool("triggered");
                 _last = Analysis.Run(_data, _sampleRate);
+                for (int i = 0; i < 8; i++) if (_hdr[i].Value > 0) _ctx.Map[(int)_hdr[i].Value].LaChecked = true;
+                _ctx.RaiseMap();
                 _wave.SetData(_data, _sampleRate, Labels());
                 ShowResults();
                 _state.ForeColor = Color.DarkGreen;
@@ -220,6 +296,62 @@ namespace CasinoSignTool
             _ctx.RaiseMap();
             _state.ForeColor = Color.DarkGreen;
             _state.Text = changed == 0 ? "Nothing to put in the map (set the header pins first)." : $"Pin map updated: {string.Join(", ", notes)}. Check it in tab 1.";
+        }
+    }
+
+    /// <summary>The 50-pin header as 2 rows of 25 (odd pins on top), coloured by role, with channel assignments.</summary>
+    public class PinPicker : Control
+    {
+        public HeaderMap Map;
+        public NumericUpDown[] Channels;
+        public Color[] ChannelColors;
+        public event Action<int> PinClicked;
+        public PinPicker() { DoubleBuffered = true; ResizeRedraw = true; Cursor = Cursors.Hand; }
+
+        int Cols => ((Map?.Pins.Count ?? 50) + 1) / 2;
+        RectangleF Cell(int pin)
+        {
+            float cw = (Width - 24f) / Cols, ch = 30f;
+            int col = (pin - 1) / 2, row = (pin - 1) % 2;
+            return new RectangleF(20 + col * cw, 14 + row * (ch + 4), cw - 2, ch);
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            if (Map == null) return;
+            for (int p = 1; p <= Map.Pins.Count; p++) if (Cell(p).Contains(e.Location)) { PinClicked?.Invoke(p); return; }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+            if (Map == null) return;
+            using var f = new Font("Segoe UI", 6.5f); using var fb = new Font("Segoe UI", 7f, FontStyle.Bold);
+            var cen = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString("odd", f, Brushes.Gray, 0, 22); g.DrawString("even", f, Brushes.Gray, 0, 56);
+            for (int p = 1; p <= Map.Pins.Count; p++)
+            {
+                var hp = Map[p]; var r = Cell(p);
+                bool guess = Roles.Signals.Contains(hp.R) && !LogicTab.Confirmed(hp);   // sniff guess: show as busy, not identified
+                Color back = hp.R == PinRole.Unknown || guess ? (hp.SniffHz > 0 || guess ? Color.White : Color.FromArgb(225, 225, 225)) : Roles.Color(hp.R);
+                if (hp.R == PinRole.NC) back = Color.FromArgb(185, 185, 185);
+                using (var b = new SolidBrush(back)) g.FillRectangle(b, r);
+                g.DrawRectangle(Pens.Gray, r.X, r.Y, r.Width, r.Height);
+                bool dark = back.GetBrightness() < 0.45f;
+                string code = hp.R == PinRole.Unknown || guess ? (hp.SniffHz > 0 || guess ? "busy" : "") : Roles.Code(hp.R);
+                g.DrawString(p.ToString(), fb, dark ? Brushes.White : Brushes.Black, new RectangleF(r.X, r.Y + 1, r.Width, r.Height / 2), cen);
+                g.DrawString(code, f, dark ? Brushes.White : Brushes.DimGray, new RectangleF(r.X - 3, r.Y + r.Height / 2, r.Width + 6, r.Height / 2), cen);
+                if (hp.LaChecked) g.DrawString("✓", fb, Brushes.Green, r.Right - 8, r.Y - 3);
+                int ch = Array.FindIndex(Channels, c => c.Value == p);
+                if (ch >= 0)
+                {
+                    using var pen = new Pen(ChannelColors[ch], 3f);
+                    g.DrawRectangle(pen, r.X - 1, r.Y - 1, r.Width + 2, r.Height + 2);
+                    var tag = (p % 2 == 1) ? new RectangleF(r.X, r.Y - 13, r.Width, 12) : new RectangleF(r.X, r.Bottom + 1, r.Width, 12);
+                    using var tb = new SolidBrush(ChannelColors[ch]);
+                    g.DrawString((ch + 1).ToString(), fb, tb, tag, cen);
+                }
+            }
         }
     }
 

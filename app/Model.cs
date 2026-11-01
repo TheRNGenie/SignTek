@@ -83,6 +83,7 @@ namespace CasinoSignTool
         public string LastSniff { get; set; } = "";
         public double SniffHz { get; set; }
         public double SniffDuty { get; set; } = -1;
+        public bool LaChecked { get; set; }            // recorded by the logic analyzer at least once
 
         [System.Web.Script.Serialization.ScriptIgnore]
         public PinRole R { get => Roles.FromCode(Role); set => Role = Roles.Code(value); }

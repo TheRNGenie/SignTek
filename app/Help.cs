@@ -145,11 +145,11 @@ Each channel: controller pin > 10 kΩ resistor > ESP32 pin. One extra wire joins
 Press Show wiring picture (both boards) in the tab for a drawing of every wire. The IO plug: channel 1 (GPIO 35) is the pin your sniff wire already works on.
 
 ## Using it
-- 1. Type the header pin each channel is clipped to (0 = none), or press Fill header pins with busy pins from my sniff map.
+- 1. Pick the pins. The tab shows your pin map as the 50-pin socket: black = GND, red = 3V3 (never clip these), grey = dead, white = busy but not identified yet, coloured = identified by the analyzer, ✓ = already recorded. Press Import a map file… to load a map you saved from tab 1 (it becomes the map in tab 1 too). Press Pick the next 8 pins to check to fill the channels automatically, or click pins on the socket picture to put them on channels (click again to take one off). You can also type header pin numbers by hand.
 - 2. Power the sign normally so the controller is running. Connect the ESP32 by USB.
 - 3. Speed Fastest, press Capture. Over USB it takes about 6 seconds to arrive.
 - 4. The Result column and the text box show the guess for each channel, with the reason. Press Put results in the pin map to save them in tab 1.
-- 5. Keep the channels found as CLK and LAT clipped on channels 1 and 2, move the other 6 clips to new busy pins, and capture again. Repeat until every busy pin has been checked.
+- 5. Press Pick the next 8 pins to check again. Once CLK and LAT are found it keeps them on channels 1 and 2 and puts 6 pins that haven't been recorded yet on the rest. Move the clips to match and capture again. The line under the socket shows how many pins are left.
 - 6. For the row lines (A, B, C) and OE, also capture at 100 kHz: many rows fit into one capture, so the slow on/off pattern is clear.
 
 ## How it decides
