@@ -76,6 +76,9 @@ namespace CasinoSignTool
                 grid.Controls.Add(_chResult[i], 3, i + 1);
             }
             left.Controls.Add(grid);
+            var pic = new Button { Text = "Show wiring picture (both boards)", AutoSize = true, Font = new Font(Font, FontStyle.Bold) };
+            pic.Click += (s, e) => ShowPicture();
+            left.Controls.Add(pic);
             var fill = new Button { Text = "Fill header pins with busy pins from my sniff map", AutoSize = true };
             fill.Click += (s, e) => FillFromMap();
             left.Controls.Add(fill);
@@ -116,6 +119,17 @@ namespace CasinoSignTool
             _report.Text = "Results appear here after a capture.";
             right.Controls.Add(_report, 0, 1);
             root.Controls.Add(right, 1, 0);
+        }
+
+        void ShowPicture()
+        {
+            using var st = typeof(LogicTab).Assembly.GetManifestResourceStream("logic-wiring.png");
+            if (st == null) return;
+            var bmp = new Bitmap(st);
+            var f = new Form { Text = "Logic analyzer wiring: both boards", ClientSize = new Size(Math.Min(1400, bmp.Width), Math.Min(900, bmp.Height)), StartPosition = FormStartPosition.CenterParent };
+            f.Controls.Add(new PictureBox { Image = bmp, Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom });
+            f.FormClosed += (s, e) => bmp.Dispose();
+            f.Show(FindForm());
         }
 
         void FillFromMap()

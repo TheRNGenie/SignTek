@@ -1,6 +1,6 @@
 {
-  "version": "1.2.0",
+  "version": "1.2.1",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8459169,
-  "notes": "- New tab 1b. Logic analyzer: the ESP32 records 8 controller pins at once and the app works out CLK, LAT, OE, DATA and rows A/B/C, then puts them in the pin map.\n- Sign firmware 3.1.0 (adds the capture command; includes the 3.0.3 screen start-up fix). After updating, install it in tab 0."
+  "size": 8690761,
+  "notes": "- Logic analyzer tab: Show wiring picture (both boards) button with every wire drawn.\n- Sniff picture and default now use GPIO 35 (the IO-plug pin that works on your board).\n- Includes sign firmware 3.1.0."
 }

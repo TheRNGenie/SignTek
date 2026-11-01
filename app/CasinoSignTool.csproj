@@ -10,7 +10,7 @@
     <Nullable>disable</Nullable>
     <AssemblyName>CasinoSignTool</AssemblyName>
     <RootNamespace>CasinoSignTool</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Product>Casino Sign Tool</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
@@ -29,5 +29,6 @@
     <EmbeddedResource Include="sniff-lead.png" LogicalName="sniff-lead.png" />
     <EmbeddedResource Include="esp32-back.png" LogicalName="esp32-back.png" />
     <EmbeddedResource Include="sniff-setup-3v3.png" LogicalName="sniff-setup-3v3.png" />
+    <EmbeddedResource Include="logic-wiring.png" LogicalName="logic-wiring.png" />
   </ItemGroup>
 </Project>

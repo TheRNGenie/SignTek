@@ -94,7 +94,7 @@ namespace CasinoSignTool
         public int PinCount { get; set; } = 50;
         public bool FlipView { get; set; }           // mirror left/right (socket seen from the other side)
         public string ProbeGpio { get; set; } = "25";
-        public string SniffGpio { get; set; } = "39";
+        public string SniffGpio { get; set; } = "35";
         public List<HeaderPin> Pins { get; set; } = new List<HeaderPin>();
 
         public HeaderMap() { EnsurePins(); }

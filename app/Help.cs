@@ -142,7 +142,7 @@ Each channel: controller pin > 10 kΩ resistor > ESP32 pin. One extra wire joins
 - Channel 3: GPIO 25, I2C plug, the pin next to GND.
 - Channel 4: GPIO 32, I2C plug, the pin next to 3V3.
 - Channels 5 to 8: GPIO 5, 18, 19, 23: the SPI plug's 4 pins in order (the SD card slot must be empty).
-Tab 1 has Show where it plugs into the ESP32 for a picture of the plugs.
+Press Show wiring picture (both boards) in the tab for a drawing of every wire. The IO plug: channel 1 (GPIO 35) is the pin your sniff wire already works on.
 
 ## Using it
 - 1. Type the header pin each channel is clipped to (0 = none), or press Fill header pins with busy pins from my sniff map.
