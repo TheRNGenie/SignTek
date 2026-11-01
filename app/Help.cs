@@ -197,9 +197,10 @@ In tab 1 (Pin mapper), choose Panel 16-pin grey ribbon at the top. It has its ow
 - In between (busy signal lines): pins 1, 2, 3, 4, 9, 10, 13, 16 (about 1.8 to 2.6 V), and pin 14 (0.2 V: mostly low with short pulses, typical of a latch).
 - Pin 5 at 3.1 V: mostly high with short low moments, typical of a blanking (OE) line or a slow signal.
 - Nothing above 3.3 V, and the input chip U2 runs at about 2.4 V: no level shifter needed. Supply across the big capacitors is 5 V.
+- Round 1 capture (pins 1, 2, 3, 4, 5, 9, 10, 13): pins 1 and 9 are clean square waves, pin 9 exactly 4 times faster than pin 1 (row address lines). Pin 2 slow data/control. Pins 5 and 13 always high. Pins 3, 4, 10 fast but choppy with 10 kΩ resistors: re-record with 1 kΩ.
 
 ## Step 3. Record the busy pins
-- 1. Check the highest voltage on the busy pins. If every pin is at or under about 3.6 V, wire each analyzer channel with a single 10 kΩ resistor, like on the V-002.
+- 1. Check the highest voltage on the busy pins. If every pin is at or under about 3.6 V, wire each analyzer channel with a single 1 kΩ resistor (brown-black-red; 470 Ω is fine too). Don't use 10 kΩ here: the panel's high level is only about 2.5 V, right at the ESP32's limit, and 10 kΩ rounds off the fast edges so fast lines flicker.
 - 2. If any pin reads near 5 V, the panels run at 5 V: use the 10 kΩ + 20 kΩ divider on every channel (tab 1, Show 5 V version) so the ESP32 sees at most 3.3 V.
 - 3. Connect to the right-hand header with female-to-male jumper wires pushed onto the header pins (ribbon still off). Join ESP32 GND to a header GND pin.
 - 4. Sign on. Logic analyzer tab: press Pick the next 8 pins to check, then Capture (try Fastest first, then Turbo). Press Put results in the pin map.

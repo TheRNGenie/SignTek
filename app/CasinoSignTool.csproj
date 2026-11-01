@@ -10,7 +10,7 @@
     <Nullable>disable</Nullable>
     <AssemblyName>CasinoSignTool</AssemblyName>
     <RootNamespace>CasinoSignTool</RootNamespace>
-    <Version>1.3.2</Version>
+    <Version>1.3.3</Version>
     <Product>Casino Sign Tool</Product>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>

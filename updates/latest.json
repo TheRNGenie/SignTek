@@ -1,6 +1,6 @@
 {
-  "version": "1.3.2",
+  "version": "1.3.3",
   "zip": "updates/CasinoSignTool.zip",
-  "size": 8708597,
-  "notes": "- The panel connector map now has 16 pins (your readings are kept).\n- Logic analyzer: Pick the next 8 pins puts busy pins (by voltage reading) first.\n- Help (? Panel steps): your readings and what they mean.\n- No firmware change."
+  "size": 8709011,
+  "notes": "- Panel steps: use 1k resistors (not 10k) for the logic analyzer on the panel connector.\n- Panel steps: round 1 capture results added.\n- No firmware change."
 }
